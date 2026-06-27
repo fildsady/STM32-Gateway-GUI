@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 
 namespace STM32GatewayGui;
 
@@ -16,7 +17,8 @@ public partial class MainWindow : Window
 
     const byte CAN_CMD_PLAY = 1, CAN_CMD_STOP = 2, CAN_CMD_NEXT = 3;
     const byte CAN_CMD_PREV = 4, CAN_CMD_PAUSE = 5, CAN_CMD_VOL = 6;
-    const byte CAN_CMD_GET  = 0x10;
+    const byte CAN_CMD_REPEAT = 7, CAN_CMD_MONO = 8, CAN_CMD_AUTO = 9;
+    const byte CAN_CMD_GET = 0x10;
 
     const uint CAN_ID_CMD_BASE = 0x100, CAN_ID_NAME_BASE = 0x200, CAN_ID_STATUS_BASE = 0x300;
 
@@ -25,9 +27,9 @@ public partial class MainWindow : Window
     private SerialPort? _port;
     private CancellationTokenSource? _cts;
     private int _txCount, _rxCount, _lastState, _pollCycle;
+    private bool _suppressVol, _suppressRepeat, _monoState, _autoplayState = true;
     private ushort _uptimeLow;
     private bool _uptimeHiPending;
-    private bool _suppressVol;
     private DateTime _lastVolSend = DateTime.MinValue;
     private readonly string[] _nameFrames = new string[20];
 
@@ -57,8 +59,7 @@ public partial class MainWindow : Window
             if (double.IsNaN(l) || w < 100) return;
             if (WindowState == WindowState.Maximized)
             { var b = RestoreBounds; l = b.Left; t = b.Top; w = b.Width; h = b.Height; }
-            File.WriteAllText(WindowPath,
-                $"{l:F0},{t:F0},{w:F0},{h:F0},{(WindowState == WindowState.Maximized ? 1 : 0)}");
+            File.WriteAllText(WindowPath, $"{l:F0},{t:F0},{w:F0},{h:F0},{(WindowState == WindowState.Maximized ? 1 : 0)}");
         }
         catch { }
     }
@@ -133,16 +134,14 @@ public partial class MainWindow : Window
             BtnConnect.Content = "Disconnect";
             TxtStatus.Text = "Connected";
             TxtStatus.Foreground = FindResource("CatGreen") as System.Windows.Media.Brush;
-            SaveSettings();
-            Log("Connected");
+            SaveSettings(); Log("Connected");
         }
         catch (Exception ex) { Log($"Failed: {ex.Message}"); }
     }
 
     private void Disconnect()
     {
-        _cts?.Cancel();
-        _port?.Close(); _port?.Dispose(); _port = null;
+        _cts?.Cancel(); _port?.Close(); _port?.Dispose(); _port = null;
         BtnConnect.Content = "Connect";
         TxtStatus.Text = "Disconnected";
         TxtStatus.Foreground = FindResource("CatRed") as System.Windows.Media.Brush;
@@ -161,11 +160,9 @@ public partial class MainWindow : Window
             {
                 if (_port == null || !_port.IsOpen) break;
                 int b = _port.ReadByte();
-
                 if (b == CMD_CAN_RX)
                 {
-                    int n = _port.Read(buf, 0, 3);
-                    if (n < 3) continue;
+                    _port.Read(buf, 0, 3);
                     uint id = (uint)((buf[0] << 8) | buf[1]);
                     int dlc = buf[2]; if (dlc > 8) dlc = 8;
                     if (dlc > 0) _port.Read(buf, 3, dlc);
@@ -200,19 +197,15 @@ public partial class MainWindow : Window
 
                 if (useCan)
                 {
-                    uint target = GetCanTarget();
-                    SendCanFrame(CAN_ID_CMD_BASE + target, [CAN_CMD_GET, 0]);
+                    SendCanFrame(CAN_ID_CMD_BASE + GetCanTarget(), [CAN_CMD_GET, 0]);
                 }
                 else
                 {
                     byte slave = GetMbSlave();
-                    SendMbRead(slave, 0x0000, 9);
-                    Thread.Sleep(50);
-                    SendMbRead(slave, 0x0020, 8);
-                    Thread.Sleep(50);
+                    SendMbRead(slave, 0x0000, 9); Thread.Sleep(50);
+                    SendMbRead(slave, 0x0020, 8); Thread.Sleep(50);
                     Dispatcher.Invoke(() => _uptimeHiPending = true);
-                    SendMbRead(slave, 0x0028, 1);
-                    Thread.Sleep(50);
+                    SendMbRead(slave, 0x0028, 1); Thread.Sleep(50);
                     if (_pollCycle % 2 == 0)
                         SendMbRead(slave, 0x0100, 16);
                     else
@@ -225,13 +218,12 @@ public partial class MainWindow : Window
         }
     }
 
-    // ── Parse CAN frames ────────────────────────────────────────
+    // ── Parse CAN ───────────────────────────────────────────────
     private void ParseCanFrame(uint id, byte[] data)
     {
         if (id >= CAN_ID_STATUS_BASE && id <= CAN_ID_STATUS_BASE + 0x7F && data.Length >= 7)
         {
-            int state = data[0];
-            _lastState = state;
+            int state = data[0]; _lastState = state;
             TxtState.Text = $"State: {(state < StateNames.Length ? StateNames[state] : "?")}";
             BtnPlayPause.Content = state == 1 ? "⏸ Pause" : "▶ Play";
             TxtTrack.Text = $"Track: {data[1] + 1}";
@@ -239,10 +231,9 @@ public partial class MainWindow : Window
             TxtVolume.Text = $"Volume: {data[2]}%";
             SliderVol.Value = data[2]; TxtVol.Text = $"{data[2]}%";
             _suppressVol = false;
-            TxtSample.Text = $"Sample: {data[4]}kHz";
+            TxtFormat.Text = $"{data[4]}kHz";
             TxtTemp.Text = $"Temp: {data[5]}°C";
-            TxtGroup.Text = $"Group: {(char)('A' + data[6])}";
-            TxtBus.Text = "Bus: OK";
+            TxtSD.Text = $"Group: {(char)('A' + data[6])}";
         }
         if (id >= CAN_ID_NAME_BASE && id <= CAN_ID_NAME_BASE + 0x7F && data.Length >= 1)
         {
@@ -260,20 +251,18 @@ public partial class MainWindow : Window
         }
     }
 
-    // ── Parse Modbus response ───────────────────────────────────
+    // ── Parse Modbus ────────────────────────────────────────────
     private void ParseMbResponse(byte[] resp, int len)
     {
         if (len < 5 || resp[1] != 0x03) return;
-        int bytes = resp[2];
-        int count = bytes / 2;
+        int bytes = resp[2], count = bytes / 2;
         ushort[] regs = new ushort[count];
         for (int i = 0; i < count && (3 + i * 2 + 1) < len; i++)
             regs[i] = (ushort)((resp[3 + i * 2] << 8) | resp[3 + i * 2 + 1]);
 
         if (count == 9 && regs[0] <= 3)
         {
-            int state = regs[0];
-            _lastState = state;
+            int state = regs[0]; _lastState = state;
             TxtState.Text = $"State: {(state < StateNames.Length ? StateNames[state] : "?")}";
             BtnPlayPause.Content = state == 1 ? "⏸ Pause" : "▶ Play";
             TxtTrack.Text = $"Track: {regs[1] + 1}/{regs[2]}";
@@ -281,23 +270,31 @@ public partial class MainWindow : Window
             TxtVolume.Text = $"Volume: {regs[3]}%";
             SliderVol.Value = regs[3]; TxtVol.Text = $"{regs[3]}%";
             _suppressVol = false;
-            TxtRepeat.Text = $"Repeat: {regs[4]}";
-            TxtBus.Text = $"SD: {(regs[7] != 0 ? "OK" : "—")}";
+            int rep = regs[4];
+            TxtRepeat.Text = $"Repeat: {rep}";
+            _suppressRepeat = true;
+            if (rep < CmbRepeat.Items.Count) CmbRepeat.SelectedIndex = rep;
+            _suppressRepeat = false;
+            _monoState = regs[5] != 0;
+            BtnMono.Content = _monoState ? "Mono: On" : "Mono: Off";
+            _autoplayState = regs[6] != 0;
+            BtnAutoplay.Content = _autoplayState ? "Auto: On" : "Auto: Off";
+            TxtSD.Text = $"SD: {(regs[7] != 0 ? "OK" : "—")}";
         }
         else if (count == 8)
         {
-            uint upSec = regs[0];
             _uptimeLow = regs[0];
             TxtTemp.Text = $"Temp: {regs[1] / 10.0:F1}°C";
-            TxtSample.Text = $"{regs[6] * 100 / 1000}kHz";
+            TxtFwVer.Text = $"FW: {regs[2]}.{regs[3]}";
+            TxtHeap.Text = $"Heap: {regs[5] * 16 / 1024}KB";
+            uint sr = (uint)regs[6] * 100;
+            TxtFormat.Text = sr > 0 ? $"{sr / 1000}kHz" : "—";
         }
         else if (count == 1 && _uptimeHiPending)
         {
             uint upSec = (uint)regs[0] << 16 | _uptimeLow;
-            int d = (int)(upSec / 86400);
-            int h = (int)(upSec % 86400 / 3600);
-            int m = (int)(upSec % 3600 / 60);
-            int s = (int)(upSec % 60);
+            int d = (int)(upSec / 86400), h = (int)(upSec % 86400 / 3600);
+            int m = (int)(upSec % 3600 / 60), s = (int)(upSec % 60);
             TxtUptime.Text = $"Up: {d}d {h:D2}:{m:D2}:{s:D2}";
             _uptimeHiPending = false;
         }
@@ -307,15 +304,19 @@ public partial class MainWindow : Window
             foreach (var r in regs)
             {
                 char hi = (char)(r >> 8), lo = (char)(r & 0xFF);
-                if (hi != 0) sb.Append(hi);
-                if (lo != 0) sb.Append(lo);
+                if (hi != 0) sb.Append(hi); if (lo != 0) sb.Append(lo);
             }
             string name = sb.ToString().TrimEnd('\0');
             if (name.Length > 0) TxtTrackName.Text = $"♪ {name}";
         }
         else if (count == 6 && regs[0] >= 2020)
         {
-            TxtGroup.Text = $"RTC: {regs[3]:D2}:{regs[4]:D2}:{regs[5]:D2}";
+            string[] dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+            string dow = "";
+            try { dow = dayNames[(int)new DateTime(regs[0], regs[1], regs[2]).DayOfWeek] + " "; } catch { }
+            string rtc = $"RTC: {dow}{regs[2]:D2}/{regs[1]:D2}/{regs[0]} {regs[3]:D2}:{regs[4]:D2}:{regs[5]:D2}";
+            TxtRtcTime.Text = rtc;
+            TxtRtcDisplay.Text = rtc;
         }
     }
 
@@ -357,8 +358,7 @@ public partial class MainWindow : Window
             req[2] = (byte)(start >> 8); req[3] = (byte)(start & 0xFF);
             req[4] = (byte)(count >> 8); req[5] = (byte)(count & 0xFF);
             var crc = Crc16(req, 6); req[6] = (byte)(crc & 0xFF); req[7] = (byte)(crc >> 8);
-            byte[] pkt = new byte[10];
-            pkt[0] = CMD_MB_TX; pkt[1] = 8;
+            byte[] pkt = new byte[10]; pkt[0] = CMD_MB_TX; pkt[1] = 8;
             Array.Copy(req, 0, pkt, 2, 8);
             _port.Write(pkt, 0, 10); _txCount++;
         }
@@ -375,10 +375,31 @@ public partial class MainWindow : Window
             req[2] = (byte)(addr >> 8); req[3] = (byte)(addr & 0xFF);
             req[4] = (byte)(value >> 8); req[5] = (byte)(value & 0xFF);
             var crc = Crc16(req, 6); req[6] = (byte)(crc & 0xFF); req[7] = (byte)(crc >> 8);
-            byte[] pkt = new byte[10];
-            pkt[0] = CMD_MB_TX; pkt[1] = 8;
+            byte[] pkt = new byte[10]; pkt[0] = CMD_MB_TX; pkt[1] = 8;
             Array.Copy(req, 0, pkt, 2, 8);
             _port.Write(pkt, 0, 10); _txCount++;
+        }
+        catch { }
+    }
+
+    private void SendMbWriteMultiple(byte slave, ushort addr, ushort[] values)
+    {
+        if (_port == null || !_port.IsOpen) return;
+        try
+        {
+            int count = values.Length;
+            byte[] req = new byte[9 + count * 2];
+            req[0] = slave; req[1] = 0x10;
+            req[2] = (byte)(addr >> 8); req[3] = (byte)(addr & 0xFF);
+            req[4] = (byte)(count >> 8); req[5] = (byte)(count & 0xFF);
+            req[6] = (byte)(count * 2);
+            for (int i = 0; i < count; i++)
+            { req[7 + i * 2] = (byte)(values[i] >> 8); req[7 + i * 2 + 1] = (byte)(values[i] & 0xFF); }
+            var crc = Crc16(req, 7 + count * 2);
+            req[7 + count * 2] = (byte)(crc & 0xFF); req[7 + count * 2 + 1] = (byte)(crc >> 8);
+            byte[] pkt = new byte[2 + req.Length]; pkt[0] = CMD_MB_TX; pkt[1] = (byte)req.Length;
+            Array.Copy(req, 0, pkt, 2, req.Length);
+            _port.Write(pkt, 0, pkt.Length); _txCount++;
         }
         catch { }
     }
@@ -396,14 +417,17 @@ public partial class MainWindow : Window
     {
         if (RbCan.IsChecked == true)
         {
-            uint target = 0x10;
-            if (uint.TryParse(TxtCanTarget.Text.Trim(), NumberStyles.HexNumber, null, out uint v)) target = v;
-            SendCanFrame(CAN_ID_CMD_BASE + target, [cmd, val]);
+            uint t = 0x10;
+            if (uint.TryParse(TxtCanTarget.Text.Trim(), NumberStyles.HexNumber, null, out uint v)) t = v;
+            SendCanFrame(CAN_ID_CMD_BASE + t, [cmd, val]);
         }
         else
         {
             byte slave = GetMbSlave();
             if (cmd == CAN_CMD_VOL) SendMbWrite(slave, 0x0003, val);
+            else if (cmd == CAN_CMD_REPEAT) SendMbWrite(slave, 0x0004, val);
+            else if (cmd == CAN_CMD_MONO) SendMbWrite(slave, 0x0005, val);
+            else if (cmd == CAN_CMD_AUTO) SendMbWrite(slave, 0x0006, val);
             else { ushort c = cmd switch { 1=>1,2=>2,3=>3,4=>4,5=>5,_=>0 }; if (c > 0) SendMbWrite(slave, 0x0010, c); }
         }
     }
@@ -422,33 +446,101 @@ public partial class MainWindow : Window
         SendCmd(CAN_CMD_VOL, (byte)SliderVol.Value);
     }
 
-    // ── Raw send ────────────────────────────────────────────────
-    private byte[] ParseHexData()
+    private void CmbRepeat_Changed(object sender, SelectionChangedEventArgs e)
     {
-        var parts = TxtSendData.Text.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var data = new byte[parts.Length];
-        for (int i = 0; i < parts.Length; i++) data[i] = byte.Parse(parts[i], NumberStyles.HexNumber);
-        return data;
+        if (_suppressRepeat) return;
+        SendCmd(CAN_CMD_REPEAT, (byte)CmbRepeat.SelectedIndex);
     }
 
-    private void BtnSendCan_Click(object sender, RoutedEventArgs e)
+    private void BtnMono_Click(object sender, RoutedEventArgs e)
     {
-        try { uint id = uint.Parse(TxtSendId.Text.Trim(), NumberStyles.HexNumber); SendCanFrame(id, ParseHexData()); Log($"CAN TX 0x{id:X3}"); }
-        catch (Exception ex) { Log($"Error: {ex.Message}"); }
+        _monoState = !_monoState;
+        SendCmd(CAN_CMD_MONO, (byte)(_monoState ? 1 : 0));
+        BtnMono.Content = _monoState ? "Mono: On" : "Mono: Off";
     }
 
-    private void BtnSendMb_Click(object sender, RoutedEventArgs e)
+    private void BtnAutoplay_Click(object sender, RoutedEventArgs e)
+    {
+        _autoplayState = !_autoplayState;
+        SendCmd(CAN_CMD_AUTO, (byte)(_autoplayState ? 1 : 0));
+        BtnAutoplay.Content = _autoplayState ? "Auto: On" : "Auto: Off";
+    }
+
+    private void BtnGoto_Click(object sender, RoutedEventArgs e)
+    {
+        if (RbModbus.IsChecked == true && ushort.TryParse(TxtGoto.Text, out ushort idx))
+            SendMbWrite(GetMbSlave(), 0x0011, idx);
+    }
+
+    // ── Siggen ──────────────────────────────────────────────────
+    private void BtnSigStart_Click(object sender, RoutedEventArgs e)
+    {
+        ushort type = (ushort)(CmbSigType.SelectedIndex + 1);
+        if (!ushort.TryParse(TxtSigFreq.Text, out ushort freq)) freq = 1000;
+        if (RbCan.IsChecked == true)
+        {
+            uint t = GetCanTarget();
+            SendCanFrame(CAN_ID_CMD_BASE + t, [0x0A, 0x00, (byte)type, (byte)(freq & 0xFF), (byte)(freq >> 8)]);
+        }
+        else
+        {
+            byte slave = GetMbSlave();
+            SendMbWrite(slave, 0x0013, type);
+            SendMbWrite(slave, 0x0014, freq);
+            SendMbWrite(slave, 0x0012, 1);
+        }
+    }
+
+    private void BtnSigStop_Click(object sender, RoutedEventArgs e)
+    {
+        if (RbCan.IsChecked == true)
+            SendCanFrame(CAN_ID_CMD_BASE + GetCanTarget(), [0x0A, 0x01]);
+        else
+            SendMbWrite(GetMbSlave(), 0x0012, 0);
+    }
+
+    // ── RTC Sync ────────────────────────────────────────────────
+    private void BtnRtcSync_Click(object sender, RoutedEventArgs e)
+    {
+        var now = DateTime.Now;
+        if (RbCan.IsChecked == true)
+        {
+            SendCanFrame(CAN_ID_CMD_BASE + GetCanTarget(),
+                [0x0B, (byte)(now.Year & 0xFF), (byte)(now.Year >> 8),
+                 (byte)now.Month, (byte)now.Day, (byte)now.Hour, (byte)now.Minute, (byte)now.Second]);
+        }
+        else
+        {
+            SendMbWriteMultiple(GetMbSlave(), 0x0015,
+                [(ushort)now.Year, (ushort)now.Month, (ushort)now.Day,
+                 (ushort)now.Hour, (ushort)now.Minute, (ushort)now.Second]);
+        }
+        Log($"RTC sync: {now:yyyy-MM-dd HH:mm:ss}");
+    }
+
+    // ── Raw Register ────────────────────────────────────────────
+    private async void BtnRegRead_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            var data = ParseHexData();
-            if (_port == null) return;
-            byte[] pkt = new byte[2 + data.Length];
-            pkt[0] = CMD_MB_TX; pkt[1] = (byte)data.Length;
-            Array.Copy(data, 0, pkt, 2, data.Length);
-            _port.Write(pkt, 0, pkt.Length); Log($"MB TX [{data.Length}]");
+            ushort addr = Convert.ToUInt16(TxtRegAddr.Text, 16);
+            ushort count = ushort.Parse(TxtRegCount.Text);
+            SendMbRead(GetMbSlave(), addr, count);
+            TxtRegResult.Text = "sent...";
         }
-        catch (Exception ex) { Log($"Error: {ex.Message}"); }
+        catch (Exception ex) { TxtRegResult.Text = ex.Message; }
+    }
+
+    private void BtnRegWrite_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            ushort addr = Convert.ToUInt16(TxtRegAddr.Text, 16);
+            ushort val = Convert.ToUInt16(TxtRegVal.Text, 16);
+            SendMbWrite(GetMbSlave(), addr, val);
+            TxtRegResult.Text = $"Write 0x{val:X4} → 0x{addr:X4}";
+        }
+        catch (Exception ex) { TxtRegResult.Text = ex.Message; }
     }
 
     private void BtnClear_Click(object sender, RoutedEventArgs e) { TxtLog.Clear(); _txCount = 0; _rxCount = 0; }
