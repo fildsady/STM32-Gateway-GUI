@@ -158,24 +158,12 @@ public partial class MainWindow : Window
         int idx = CmbBaud.SelectedIndex;
         if (idx < 0 || _port == null || !_port.IsOpen) return;
 
-        /* Send magic header to bridge: [0xFE, 0xFE, 0x01, baud_idx] */
         try
         {
             _port.Write(new byte[] { 0xFE, 0xFE, 0x01, (byte)idx }, 0, 4);
             Log($"Bridge baud → {BaudNames[idx]}");
         }
         catch { }
-
-        /* Also set target device baud (optional) */
-        Task.Run(() =>
-        {
-            Thread.Sleep(100);
-            if (RbModbus.IsChecked == true)
-                SendMbWrite(GetMbSlave(), 0x0027, (ushort)idx);
-            else
-                SendCanFrame(CAN_ID_CMD_BASE + GetCanTarget(), [0x06, (byte)idx]);
-            Dispatcher.BeginInvoke(() => Log($"Target baud → {BaudNames[idx]}"));
-        });
         SaveSettings();
     }
 
