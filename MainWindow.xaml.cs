@@ -92,7 +92,7 @@ public partial class MainWindow : Window
         {
             string port = CmbPort.SelectedItem?.ToString() ?? "";
             string bus = RbCan.IsChecked == true ? "CAN" : "MB";
-            File.WriteAllText(SettingsPath, $"{port},{TxtCanTarget.Text},{TxtMbSlave.Text},{bus},{CmbBaud.SelectedIndex}");
+            File.WriteAllText(SettingsPath, $"{port},{TxtCanTarget.Text},{TxtMbSlave.Text},{bus},{CmbMbBaud.SelectedIndex},{CmbCanBaud.SelectedIndex}");
         }
         catch { }
     }
@@ -108,7 +108,8 @@ public partial class MainWindow : Window
             if (p.Length >= 2) TxtCanTarget.Text = p[1];
             if (p.Length >= 3) TxtMbSlave.Text = p[2];
             if (p.Length >= 4) { RbCan.IsChecked = p[3] == "CAN"; RbModbus.IsChecked = p[3] == "MB"; }
-            if (p.Length >= 5 && int.TryParse(p[4], out int bi) && bi >= 0 && bi < 7) CmbBaud.SelectedIndex = bi;
+            if (p.Length >= 5 && int.TryParse(p[4], out int mbi) && mbi >= 0 && mbi < 7) CmbMbBaud.SelectedIndex = mbi;
+            if (p.Length >= 6 && int.TryParse(p[5], out int cbi) && cbi >= 0 && cbi < 6) CmbCanBaud.SelectedIndex = cbi;
         }
         catch { }
     }
@@ -151,20 +152,80 @@ public partial class MainWindow : Window
 
     private void BtnRefresh_Click(object sender, RoutedEventArgs e) => RefreshPorts();
 
-    private static readonly string[] BaudNames = ["9600","19200","38400","57600","115200","230400","460800"];
+    static readonly string[] MbBaudNames = ["9600","19200","38400","57600","115200","230400","460800"];
+    static readonly string[] CanBaudNames = ["20k","50k","125k","250k","500k","1M"];
 
-    private void BtnSetBaud_Click(object sender, RoutedEventArgs e)
+    private void BtnSetMbBaud_Click(object sender, RoutedEventArgs e)
     {
-        int idx = CmbBaud.SelectedIndex;
+        int idx = CmbMbBaud.SelectedIndex;
         if (idx < 0 || _port == null || !_port.IsOpen) return;
+        try { _port.Write(new byte[] { 0xFE, 0xFE, 0x01, (byte)idx }, 0, 4); Log($"MB baud → {MbBaudNames[idx]}"); } catch { }
+        SaveSettings();
+    }
 
+    private void BtnSetCanBaud_Click(object sender, RoutedEventArgs e)
+    {
+        int idx = CmbCanBaud.SelectedIndex;
+        if (idx < 0 || _port == null || !_port.IsOpen) return;
+        try { _port.Write(new byte[] { 0xFE, 0xFE, 0x02, (byte)idx }, 0, 4); Log($"CAN baud → {CanBaudNames[idx]}"); } catch { }
+        SaveSettings();
+    }
+
+    private void BtnFaultLog_Click(object sender, RoutedEventArgs e)
+    {
+        if (_port == null || !_port.IsOpen) return;
         try
         {
-            _port.Write(new byte[] { 0xFE, 0xFE, 0x01, (byte)idx }, 0, 4);
-            Log($"Bridge baud → {BaudNames[idx]}");
+            _port.Write(new byte[] { 0xFE, 0xFE, 0x10 }, 0, 3);
+            Log("Requesting fault log...");
+            Task.Run(() =>
+            {
+                try
+                {
+                    Thread.Sleep(200);
+                    if (_port == null || _port.BytesToRead < 4) { Log("No fault data"); return; }
+                    byte[] hdr = new byte[4];
+                    _port.Read(hdr, 0, 4);
+                    if (hdr[0] != 0xFE || hdr[1] != 0xFE || hdr[2] != 0x10) return;
+                    int count = hdr[3];
+                    if (count == 0) { Dispatcher.BeginInvoke(() => Log("No faults recorded")); return; }
+                    int entrySize = 17;
+                    byte[] data = new byte[count * entrySize];
+                    int read = 0;
+                    while (read < data.Length && _port.BytesToRead > 0)
+                        read += _port.Read(data, read, data.Length - read);
+
+                    var sb = new System.Text.StringBuilder();
+                    sb.AppendLine("=== Fault Log ===");
+                    string[] types = ["?", "HardFault", "StackOverflow", "WDT", "Assert"];
+                    for (int i = 0; i < count; i++)
+                    {
+                        int off = i * entrySize;
+                        int type = data[off];
+                        uint pc = BitConverter.ToUInt32(data, off + 1);
+                        uint lr = BitConverter.ToUInt32(data, off + 5);
+                        uint uptime = BitConverter.ToUInt32(data, off + 9);
+                        uint cfsr = BitConverter.ToUInt32(data, off + 13);
+                        string tname = type < types.Length ? types[type] : $"0x{type:X2}";
+                        sb.AppendLine($"[{i}] {tname} PC=0x{pc:X8} LR=0x{lr:X8} up={uptime}s CFSR=0x{cfsr:X8}");
+                    }
+
+                    string logText = sb.ToString();
+                    Dispatcher.BeginInvoke(() =>
+                    {
+                        Log(logText);
+                        var dlg = new Microsoft.Win32.SaveFileDialog { Filter = "Text|*.txt", FileName = "fault_log.txt" };
+                        if (dlg.ShowDialog() == true)
+                        {
+                            System.IO.File.WriteAllText(dlg.FileName, logText);
+                            Log($"Saved: {dlg.FileName}");
+                        }
+                    });
+                }
+                catch (Exception ex) { Dispatcher.BeginInvoke(() => Log($"Fault read error: {ex.Message}")); }
+            });
         }
         catch { }
-        SaveSettings();
     }
 
     // ── RX Loop ─────────────────────────────────────────────────

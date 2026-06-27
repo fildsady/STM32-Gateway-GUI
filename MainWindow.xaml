@@ -50,8 +50,8 @@
                     <TextBlock Text="  MB ID:" VerticalAlignment="Center" Margin="8,0,4,0"/>
                     <TextBox x:Name="TxtMbSlave" Width="30" Height="24" Text="1"
                              Background="{StaticResource CatSurface0}" Foreground="{StaticResource CatText}"/>
-                    <TextBlock Text="  Baud:" VerticalAlignment="Center" Margin="8,0,4,0"/>
-                    <ComboBox x:Name="CmbBaud" Width="80" Height="24" SelectedIndex="4">
+                    <TextBlock Text="  MB:" VerticalAlignment="Center" Margin="8,0,2,0"/>
+                    <ComboBox x:Name="CmbMbBaud" Width="70" Height="24" SelectedIndex="4">
                         <ComboBoxItem Content="9600"/>
                         <ComboBoxItem Content="19200"/>
                         <ComboBoxItem Content="38400"/>
@@ -60,7 +60,17 @@
                         <ComboBoxItem Content="230400"/>
                         <ComboBoxItem Content="460800"/>
                     </ComboBox>
-                    <Button Content="Set" Click="BtnSetBaud_Click" Padding="6,4"/>
+                    <Button Content="Set" Click="BtnSetMbBaud_Click" Padding="4,4"/>
+                    <TextBlock Text=" CAN:" VerticalAlignment="Center" Margin="4,0,2,0"/>
+                    <ComboBox x:Name="CmbCanBaud" Width="60" Height="24" SelectedIndex="2">
+                        <ComboBoxItem Content="20k"/>
+                        <ComboBoxItem Content="50k"/>
+                        <ComboBoxItem Content="125k"/>
+                        <ComboBoxItem Content="250k"/>
+                        <ComboBoxItem Content="500k"/>
+                        <ComboBoxItem Content="1M"/>
+                    </ComboBox>
+                    <Button Content="Set" Click="BtnSetCanBaud_Click" Padding="4,4"/>
                     <TextBlock Text="  via:" VerticalAlignment="Center" Margin="4,0,4,0" Foreground="{StaticResource CatSubtext0}"/>
                     <RadioButton x:Name="RbCan" Content="CAN" IsChecked="True" Foreground="{StaticResource CatTeal}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <RadioButton x:Name="RbModbus" Content="Modbus" Foreground="{StaticResource CatMauve}" VerticalAlignment="Center"/>
@@ -176,6 +186,7 @@
                 <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,4">
                     <TextBlock Text="Log" FontWeight="Bold" Foreground="{StaticResource CatSubtext0}"/>
                     <Button Content="Clear" Click="BtnClear_Click" Margin="8,0,0,0" Padding="6,2"/>
+                    <Button Content="Fault Log" Click="BtnFaultLog_Click" Margin="4,0,0,0" Padding="6,2"/>
                 </WrapPanel>
                 <TextBox x:Name="TxtLog" IsReadOnly="True" VerticalScrollBarVisibility="Auto"
                          Background="#181825" Foreground="{StaticResource CatSubtext0}" FontFamily="Cascadia Mono,Consolas"
