@@ -479,15 +479,18 @@ public partial class MainWindow : Window
         if (!ushort.TryParse(TxtSigFreq.Text, out ushort freq)) freq = 1000;
         if (RbCan.IsChecked == true)
         {
-            uint t = GetCanTarget();
-            SendCanFrame(CAN_ID_CMD_BASE + t, [0x0A, 0x00, (byte)type, (byte)(freq & 0xFF), (byte)(freq >> 8)]);
+            SendCanFrame(CAN_ID_CMD_BASE + GetCanTarget(),
+                [0x0A, 0x00, (byte)type, (byte)(freq & 0xFF), (byte)(freq >> 8)]);
         }
         else
         {
             byte slave = GetMbSlave();
-            SendMbWrite(slave, 0x0013, type);
-            SendMbWrite(slave, 0x0014, freq);
-            SendMbWrite(slave, 0x0012, 1);
+            Task.Run(() =>
+            {
+                SendMbWrite(slave, 0x0013, type);  Thread.Sleep(20);
+                SendMbWrite(slave, 0x0014, freq);  Thread.Sleep(20);
+                SendMbWrite(slave, 0x0012, 1);
+            });
         }
     }
 
@@ -511,9 +514,14 @@ public partial class MainWindow : Window
         }
         else
         {
-            SendMbWriteMultiple(GetMbSlave(), 0x0015,
-                [(ushort)now.Year, (ushort)now.Month, (ushort)now.Day,
-                 (ushort)now.Hour, (ushort)now.Minute, (ushort)now.Second]);
+            byte slave = GetMbSlave();
+            Task.Run(() =>
+            {
+                Thread.Sleep(50);
+                SendMbWriteMultiple(slave, 0x0015,
+                    [(ushort)now.Year, (ushort)now.Month, (ushort)now.Day,
+                     (ushort)now.Hour, (ushort)now.Minute, (ushort)now.Second]);
+            });
         }
         Log($"RTC sync: {now:yyyy-MM-dd HH:mm:ss}");
     }
