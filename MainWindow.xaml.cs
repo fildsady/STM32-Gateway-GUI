@@ -126,7 +126,7 @@ public partial class MainWindow : Window
         if (CmbPort.SelectedItem == null) return;
         try
         {
-            _port = new SerialPort(CmbPort.SelectedItem.ToString()!, 460800, Parity.None, 8, StopBits.One)
+            _port = new SerialPort(CmbPort.SelectedItem.ToString()!, 921600, Parity.None, 8, StopBits.One)
             { ReadTimeout = 500, WriteTimeout = 500 };
             _port.Open();
             _cts = new CancellationTokenSource();
