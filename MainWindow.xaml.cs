@@ -92,7 +92,7 @@ public partial class MainWindow : Window
         {
             string port = CmbPort.SelectedItem?.ToString() ?? "";
             string bus = RbCan.IsChecked == true ? "CAN" : "MB";
-            File.WriteAllText(SettingsPath, $"{port},{TxtCanTarget.Text},{TxtMbSlave.Text},{bus}");
+            File.WriteAllText(SettingsPath, $"{port},{TxtCanTarget.Text},{TxtMbSlave.Text},{bus},{CmbBaud.SelectedIndex}");
         }
         catch { }
     }
@@ -108,6 +108,7 @@ public partial class MainWindow : Window
             if (p.Length >= 2) TxtCanTarget.Text = p[1];
             if (p.Length >= 3) TxtMbSlave.Text = p[2];
             if (p.Length >= 4) { RbCan.IsChecked = p[3] == "CAN"; RbModbus.IsChecked = p[3] == "MB"; }
+            if (p.Length >= 5 && int.TryParse(p[4], out int bi) && bi >= 0 && bi < 7) CmbBaud.SelectedIndex = bi;
         }
         catch { }
     }
@@ -149,6 +150,27 @@ public partial class MainWindow : Window
     }
 
     private void BtnRefresh_Click(object sender, RoutedEventArgs e) => RefreshPorts();
+
+    private void BtnSetBaud_Click(object sender, RoutedEventArgs e)
+    {
+        int idx = CmbBaud.SelectedIndex;
+        if (idx < 0) return;
+        if (RbModbus.IsChecked == true)
+        {
+            byte slave = GetMbSlave();
+            Task.Run(() =>
+            {
+                SendMbWrite(slave, 0x0027, (ushort)idx);
+                Thread.Sleep(200);
+                Dispatcher.BeginInvoke(() => Log($"Baud set to index {idx} — restart bridge if needed"));
+            });
+        }
+        else
+        {
+            SendCanFrame(CAN_ID_CMD_BASE + GetCanTarget(), [0x06, (byte)idx]);
+        }
+        SaveSettings();
+    }
 
     // ── RX Loop ─────────────────────────────────────────────────
     private void RxLoop(CancellationToken ct)

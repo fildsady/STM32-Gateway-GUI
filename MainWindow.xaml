@@ -49,7 +49,18 @@
                     <TextBlock Text="  MB ID:" VerticalAlignment="Center" Margin="8,0,4,0"/>
                     <TextBox x:Name="TxtMbSlave" Width="30" Height="24" Text="1"
                              Background="{StaticResource CatSurface0}" Foreground="{StaticResource CatText}"/>
-                    <TextBlock Text="  via:" VerticalAlignment="Center" Margin="8,0,4,0" Foreground="{StaticResource CatSubtext0}"/>
+                    <TextBlock Text="  Baud:" VerticalAlignment="Center" Margin="8,0,4,0"/>
+                    <ComboBox x:Name="CmbBaud" Width="80" Height="24" SelectedIndex="4">
+                        <ComboBoxItem Content="9600"/>
+                        <ComboBoxItem Content="19200"/>
+                        <ComboBoxItem Content="38400"/>
+                        <ComboBoxItem Content="57600"/>
+                        <ComboBoxItem Content="115200"/>
+                        <ComboBoxItem Content="230400"/>
+                        <ComboBoxItem Content="460800"/>
+                    </ComboBox>
+                    <Button Content="Set" Click="BtnSetBaud_Click" Padding="6,4"/>
+                    <TextBlock Text="  via:" VerticalAlignment="Center" Margin="4,0,4,0" Foreground="{StaticResource CatSubtext0}"/>
                     <RadioButton x:Name="RbCan" Content="CAN" IsChecked="True" Foreground="{StaticResource CatTeal}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <RadioButton x:Name="RbModbus" Content="Modbus" Foreground="{StaticResource CatMauve}" VerticalAlignment="Center"/>
                 </WrapPanel>
