@@ -144,7 +144,7 @@ public partial class MainWindow : Window
                     byte[] resp = new byte[len];
                     int read = 0;
                     while (read < len) read += _port.Read(resp, read, len - read);
-                    Dispatcher.BeginInvoke(() => { _rxCount++; Log($"MB RX [{len}] {BitConverter.ToString(resp).Replace("-"," ")}"); });
+                    Dispatcher.BeginInvoke(() => { _rxCount++; ParseMbResponse(resp, len); });
                 }
             }
             catch (TimeoutException) { }
@@ -212,6 +212,33 @@ public partial class MainWindow : Window
                 for (int i = 0; i < _nameFrames.Length; i++) { if (_nameFrames[i] == null) break; sb.Append(_nameFrames[i]); }
                 TxtTrackName.Text = $"♪ {sb}";
             }
+        }
+    }
+
+    // ── Parse Modbus response ─────────────────────────────────
+    private void ParseMbResponse(byte[] resp, int len)
+    {
+        if (len < 5 || resp[1] != 0x03) return;
+        int bytes = resp[2];
+        int count = bytes / 2;
+        ushort[] regs = new ushort[count];
+        for (int i = 0; i < count && (3 + i * 2 + 1) < len; i++)
+            regs[i] = (ushort)((resp[3 + i * 2] << 8) | resp[3 + i * 2 + 1]);
+
+        if (count >= 7)
+        {
+            int state = regs[0];
+            _lastState = state;
+            TxtState.Text = $"State: {(state < StateNames.Length ? StateNames[state] : "?")}";
+            BtnPlayPause.Content = state == 1 ? "⏸ Pause" : "▶ Play";
+            TxtTrack.Text = $"Track: {regs[1] + 1}/{regs[2]}";
+            _suppressVol = true;
+            TxtVolume.Text = $"Volume: {regs[3]}%";
+            SliderVol.Value = regs[3];
+            TxtVol.Text = $"{regs[3]}%";
+            _suppressVol = false;
+            TxtRepeat.Text = $"Repeat: {regs[4]}";
+            TxtBus.Text = $"SD: {(regs[7] != 0 ? "OK" : "—")}";
         }
     }
 
