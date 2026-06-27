@@ -151,24 +151,31 @@ public partial class MainWindow : Window
 
     private void BtnRefresh_Click(object sender, RoutedEventArgs e) => RefreshPorts();
 
+    private static readonly string[] BaudNames = ["9600","19200","38400","57600","115200","230400","460800"];
+
     private void BtnSetBaud_Click(object sender, RoutedEventArgs e)
     {
         int idx = CmbBaud.SelectedIndex;
-        if (idx < 0) return;
-        if (RbModbus.IsChecked == true)
+        if (idx < 0 || _port == null || !_port.IsOpen) return;
+
+        /* Send magic header to bridge: [0xFE, 0xFE, 0x01, baud_idx] */
+        try
         {
-            byte slave = GetMbSlave();
-            Task.Run(() =>
-            {
-                SendMbWrite(slave, 0x0027, (ushort)idx);
-                Thread.Sleep(200);
-                Dispatcher.BeginInvoke(() => Log($"Baud set to index {idx} — restart bridge if needed"));
-            });
+            _port.Write(new byte[] { 0xFE, 0xFE, 0x01, (byte)idx }, 0, 4);
+            Log($"Bridge baud → {BaudNames[idx]}");
         }
-        else
+        catch { }
+
+        /* Also set target device baud (optional) */
+        Task.Run(() =>
         {
-            SendCanFrame(CAN_ID_CMD_BASE + GetCanTarget(), [0x06, (byte)idx]);
-        }
+            Thread.Sleep(100);
+            if (RbModbus.IsChecked == true)
+                SendMbWrite(GetMbSlave(), 0x0027, (ushort)idx);
+            else
+                SendCanFrame(CAN_ID_CMD_BASE + GetCanTarget(), [0x06, (byte)idx]);
+            Dispatcher.BeginInvoke(() => Log($"Target baud → {BaudNames[idx]}"));
+        });
         SaveSettings();
     }
 
