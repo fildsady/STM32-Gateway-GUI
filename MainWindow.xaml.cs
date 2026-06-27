@@ -25,6 +25,8 @@ public partial class MainWindow : Window
     private SerialPort? _port;
     private CancellationTokenSource? _cts;
     private int _txCount, _rxCount, _lastState, _pollCycle;
+    private ushort _uptimeLow;
+    private bool _uptimeHiPending;
     private bool _suppressVol;
     private DateTime _lastVolSend = DateTime.MinValue;
     private readonly string[] _nameFrames = new string[20];
@@ -208,6 +210,9 @@ public partial class MainWindow : Window
                     Thread.Sleep(50);
                     SendMbRead(slave, 0x0020, 8);
                     Thread.Sleep(50);
+                    Dispatcher.Invoke(() => _uptimeHiPending = true);
+                    SendMbRead(slave, 0x0028, 1);
+                    Thread.Sleep(50);
                     if (_pollCycle % 2 == 0)
                         SendMbRead(slave, 0x0100, 16);
                     else
@@ -281,8 +286,20 @@ public partial class MainWindow : Window
         }
         else if (count == 8)
         {
+            uint upSec = regs[0];
+            _uptimeLow = regs[0];
             TxtTemp.Text = $"Temp: {regs[1] / 10.0:F1}°C";
             TxtSample.Text = $"{regs[6] * 100 / 1000}kHz";
+        }
+        else if (count == 1 && _uptimeHiPending)
+        {
+            uint upSec = (uint)regs[0] << 16 | _uptimeLow;
+            int d = (int)(upSec / 86400);
+            int h = (int)(upSec % 86400 / 3600);
+            int m = (int)(upSec % 3600 / 60);
+            int s = (int)(upSec % 60);
+            TxtUptime.Text = $"Up: {d}d {h:D2}:{m:D2}:{s:D2}";
+            _uptimeHiPending = false;
         }
         else if (count == 16)
         {

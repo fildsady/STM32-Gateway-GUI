@@ -73,6 +73,7 @@
                         <TextBlock x:Name="TxtRepeat" Text="Repeat: —"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1">
+                        <TextBlock x:Name="TxtUptime" Text="Up: —"/>
                         <TextBlock x:Name="TxtTemp" Text="Temp: —"/>
                         <TextBlock x:Name="TxtSample" Text="Sample: —"/>
                         <TextBlock x:Name="TxtGroup" Text="Group: —"/>
