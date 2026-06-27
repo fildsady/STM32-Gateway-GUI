@@ -1,0 +1,133 @@
+<Window x:Class="STM32GatewayGui.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="STM32 Gateway" Height="650" Width="520"
+        Background="#1E1E2E" Foreground="#CDD6F4"
+        FontFamily="Segoe UI" FontSize="13">
+    <Window.Resources>
+        <SolidColorBrush x:Key="CatSurface0" Color="#313244"/>
+        <SolidColorBrush x:Key="CatSurface1" Color="#45475A"/>
+        <SolidColorBrush x:Key="CatText" Color="#CDD6F4"/>
+        <SolidColorBrush x:Key="CatSubtext0" Color="#A6ADC8"/>
+        <SolidColorBrush x:Key="CatGreen" Color="#A6E3A1"/>
+        <SolidColorBrush x:Key="CatRed" Color="#F38BA8"/>
+        <SolidColorBrush x:Key="CatBlue" Color="#89B4FA"/>
+        <SolidColorBrush x:Key="CatYellow" Color="#F9E2AF"/>
+        <SolidColorBrush x:Key="CatMauve" Color="#CBA6F7"/>
+        <SolidColorBrush x:Key="CatTeal" Color="#94E2D5"/>
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource CatSurface0}"/>
+            <Setter Property="Foreground" Value="{StaticResource CatText}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CatSurface1}"/>
+            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Margin" Value="2"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Connection -->
+        <Border Grid.Row="0" Background="{StaticResource CatSurface0}" CornerRadius="8" Padding="8" Margin="0,0,0,6">
+            <StackPanel>
+                <WrapPanel>
+                    <TextBlock Text="Gateway" FontWeight="Bold" Foreground="{StaticResource CatMauve}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ComboBox x:Name="CmbPort" Width="90" Height="26"/>
+                    <Button x:Name="BtnConnect" Content="Connect" Click="BtnConnect_Click"/>
+                    <Button Content="⟳" Click="BtnRefresh_Click" Width="28"/>
+                    <TextBlock x:Name="TxtStatus" Text="Disconnected" Foreground="{StaticResource CatRed}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                </WrapPanel>
+                <WrapPanel Margin="0,3,0,0">
+                    <TextBlock Text="CAN 0x" VerticalAlignment="Center"/>
+                    <TextBox x:Name="TxtCanTarget" Width="30" Height="24" Text="10"
+                             Background="{StaticResource CatSurface0}" Foreground="{StaticResource CatText}"/>
+                    <TextBlock Text="  MB ID:" VerticalAlignment="Center" Margin="8,0,4,0"/>
+                    <TextBox x:Name="TxtMbSlave" Width="30" Height="24" Text="1"
+                             Background="{StaticResource CatSurface0}" Foreground="{StaticResource CatText}"/>
+                    <TextBlock Text="  Send via:" VerticalAlignment="Center" Margin="8,0,4,0" Foreground="{StaticResource CatSubtext0}"/>
+                    <RadioButton x:Name="RbCan" Content="CAN" IsChecked="True" Foreground="{StaticResource CatTeal}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <RadioButton x:Name="RbModbus" Content="Modbus" Foreground="{StaticResource CatMauve}" VerticalAlignment="Center"/>
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Monitor -->
+        <Border Grid.Row="1" Background="{StaticResource CatSurface0}" CornerRadius="8" Padding="8" Margin="0,0,0,6">
+            <StackPanel>
+                <TextBlock Text="Monitor" FontWeight="Bold" Foreground="{StaticResource CatGreen}" Margin="0,0,0,4"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock x:Name="TxtState" Text="State: —"/>
+                        <TextBlock x:Name="TxtTrack" Text="Track: —"/>
+                        <TextBlock x:Name="TxtVolume" Text="Volume: —"/>
+                        <TextBlock x:Name="TxtRepeat" Text="Repeat: —"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock x:Name="TxtTemp" Text="Temp: —"/>
+                        <TextBlock x:Name="TxtSample" Text="Sample: —"/>
+                        <TextBlock x:Name="TxtGroup" Text="Group: —"/>
+                        <TextBlock x:Name="TxtBus" Text="Bus: —" Foreground="{StaticResource CatSubtext0}"/>
+                    </StackPanel>
+                </Grid>
+                <TextBlock x:Name="TxtTrackName" Text="♪ —" FontSize="14" Foreground="{StaticResource CatYellow}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Control -->
+        <Border Grid.Row="2" Background="{StaticResource CatSurface0}" CornerRadius="8" Padding="8" Margin="0,0,0,6">
+            <StackPanel>
+                <TextBlock Text="Control" FontWeight="Bold" Foreground="{StaticResource CatBlue}" Margin="0,0,0,4"/>
+                <WrapPanel>
+                    <Button Content="⏮ Prev" Click="BtnPrev_Click"/>
+                    <Button x:Name="BtnPlayPause" Content="▶ Play" Click="BtnPlayPause_Click"/>
+                    <Button Content="⏹ Stop" Click="BtnStop_Click"/>
+                    <Button Content="⏭ Next" Click="BtnNext_Click"/>
+                </WrapPanel>
+                <WrapPanel Margin="0,4,0,0">
+                    <TextBlock Text="Vol:" VerticalAlignment="Center"/>
+                    <Slider x:Name="SliderVol" Width="170" Minimum="0" Maximum="100" Value="80"
+                            ValueChanged="SliderVol_Changed" IsSnapToTickEnabled="True" TickFrequency="1"/>
+                    <TextBlock x:Name="TxtVol" Text="80%" Width="36" VerticalAlignment="Center"/>
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Raw Frame -->
+        <Border Grid.Row="3" Background="{StaticResource CatSurface0}" CornerRadius="8" Padding="8" Margin="0,0,0,6">
+            <WrapPanel>
+                <TextBlock Text="Raw" FontWeight="Bold" Foreground="{StaticResource CatSubtext0}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <TextBlock Text="ID 0x" VerticalAlignment="Center"/>
+                <TextBox x:Name="TxtSendId" Width="40" Height="24" Text="110"
+                         Background="{StaticResource CatSurface0}" Foreground="{StaticResource CatText}"/>
+                <TextBlock Text=" Data:" VerticalAlignment="Center" Margin="4,0,4,0"/>
+                <TextBox x:Name="TxtSendData" Width="120" Height="24" Text="01 00"
+                         Background="{StaticResource CatSurface0}" Foreground="{StaticResource CatText}"/>
+                <Button Content="CAN" Click="BtnSendCan_Click"/>
+                <Button Content="MB" Click="BtnSendMb_Click"/>
+            </WrapPanel>
+        </Border>
+
+        <!-- Log -->
+        <Border Grid.Row="4" Background="{StaticResource CatSurface0}" CornerRadius="8" Padding="8">
+            <DockPanel>
+                <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                    <TextBlock Text="Log" FontWeight="Bold" Foreground="{StaticResource CatSubtext0}"/>
+                    <Button Content="Clear" Click="BtnClear_Click" Margin="8,0,0,0" Padding="6,2"/>
+                </WrapPanel>
+                <TextBox x:Name="TxtLog" IsReadOnly="True" VerticalScrollBarVisibility="Auto"
+                         Background="#181825" Foreground="{StaticResource CatSubtext0}" FontFamily="Cascadia Mono,Consolas"
+                         FontSize="11" TextWrapping="Wrap" BorderThickness="0"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>
