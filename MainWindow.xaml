@@ -41,6 +41,7 @@
                     <Button x:Name="BtnConnect" Content="Connect" Click="BtnConnect_Click"/>
                     <Button Content="⟳" Click="BtnRefresh_Click" Width="28"/>
                     <TextBlock x:Name="TxtStatus" Text="Disconnected" Foreground="{StaticResource CatRed}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                    <TextBlock Text=" PC:921600" Foreground="{StaticResource CatSubtext0}" VerticalAlignment="Center"/>
                 </WrapPanel>
                 <WrapPanel Margin="0,3,0,0">
                     <TextBlock Text="CAN 0x" VerticalAlignment="Center"/>
