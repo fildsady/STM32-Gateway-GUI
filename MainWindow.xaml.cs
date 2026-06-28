@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Ports;
 using System.Text;
 using System.Threading;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -650,6 +651,130 @@ public partial class MainWindow : Window
     }
 
     private void BtnClear_Click(object sender, RoutedEventArgs e) { TxtLog.Clear(); _txCount = 0; _rxCount = 0; }
+
+    // ── Register Map ────────────────────────────────────────────
+    public class RegEntry { public string Addr { get; set; } = ""; public string Name { get; set; } = ""; public string Value { get; set; } = "—"; public string Dec { get; set; } = ""; public string RW { get; set; } = ""; public string Desc { get; set; } = ""; public ushort RawAddr; }
+
+    private readonly List<RegEntry> _regMap = new()
+    {
+        new() { RawAddr=0x0000, Addr="0x0000", Name="STATE",      RW="RO", Desc="0=stop 1=play 3=pause" },
+        new() { RawAddr=0x0001, Addr="0x0001", Name="TRACK",      RW="RO", Desc="track index (0-based)" },
+        new() { RawAddr=0x0002, Addr="0x0002", Name="TRACK_COUNT", RW="RO", Desc="total tracks" },
+        new() { RawAddr=0x0003, Addr="0x0003", Name="VOLUME",     RW="RW", Desc="0-100" },
+        new() { RawAddr=0x0004, Addr="0x0004", Name="REPEAT",     RW="RW", Desc="0=All 1=One 2=Off 3=Single 4=Random" },
+        new() { RawAddr=0x0005, Addr="0x0005", Name="MONO",       RW="RW", Desc="0=stereo 1=mono" },
+        new() { RawAddr=0x0006, Addr="0x0006", Name="AUTOPLAY",   RW="RW", Desc="0=off 1=on" },
+        new() { RawAddr=0x0007, Addr="0x0007", Name="SD_OK",      RW="RO", Desc="0=no SD 1=OK" },
+        new() { RawAddr=0x0008, Addr="0x0008", Name="USB_OK",     RW="RO", Desc="always 1" },
+        new() { RawAddr=0x0010, Addr="0x0010", Name="COMMAND",    RW="WO", Desc="1=play 2=stop 3=next 4=prev 5=pause" },
+        new() { RawAddr=0x0011, Addr="0x0011", Name="GOTO_INDEX", RW="WO", Desc="track index" },
+        new() { RawAddr=0x0012, Addr="0x0012", Name="SIGGEN_CMD", RW="RW", Desc="0=stop 1=start" },
+        new() { RawAddr=0x0013, Addr="0x0013", Name="SIGGEN_TYPE",RW="RW", Desc="1=Sin 2=Sq 3=Tri 4=Saw 5=White 6=Pink" },
+        new() { RawAddr=0x0014, Addr="0x0014", Name="SIGGEN_FREQ",RW="RW", Desc="1-20000 Hz" },
+        new() { RawAddr=0x0015, Addr="0x0015", Name="RTC_YEAR",   RW="RW", Desc="e.g. 2026" },
+        new() { RawAddr=0x0016, Addr="0x0016", Name="RTC_MONTH",  RW="RW", Desc="1-12" },
+        new() { RawAddr=0x0017, Addr="0x0017", Name="RTC_DAY",    RW="RW", Desc="1-31" },
+        new() { RawAddr=0x0018, Addr="0x0018", Name="RTC_HOUR",   RW="RW", Desc="0-23" },
+        new() { RawAddr=0x0019, Addr="0x0019", Name="RTC_MIN",    RW="RW", Desc="0-59" },
+        new() { RawAddr=0x001A, Addr="0x001A", Name="RTC_SEC",    RW="WO", Desc="0-59 (write triggers set)" },
+        new() { RawAddr=0x0020, Addr="0x0020", Name="UPTIME",     RW="RO", Desc="seconds low 16-bit" },
+        new() { RawAddr=0x0021, Addr="0x0021", Name="TEMP_X10",   RW="RO", Desc="temp x10 (325=32.5C)" },
+        new() { RawAddr=0x0022, Addr="0x0022", Name="FW_MAJOR",   RW="RO", Desc="firmware major" },
+        new() { RawAddr=0x0023, Addr="0x0023", Name="FW_MINOR",   RW="RO", Desc="firmware minor" },
+        new() { RawAddr=0x0024, Addr="0x0024", Name="SLAVE_ADDR", RW="RO", Desc="Modbus slave address" },
+        new() { RawAddr=0x0025, Addr="0x0025", Name="HEAP_FREE",  RW="RO", Desc="free heap / 16" },
+        new() { RawAddr=0x0026, Addr="0x0026", Name="SAMPLE_RATE",RW="RO", Desc="sample rate / 100" },
+        new() { RawAddr=0x0027, Addr="0x0027", Name="BAUDRATE",   RW="RW", Desc="baud index 0-6" },
+        new() { RawAddr=0x0028, Addr="0x0028", Name="UPTIME_HI",  RW="RO", Desc="seconds high 16-bit" },
+    };
+
+    private bool _regMapInit;
+
+    private void InitRegMap()
+    {
+        if (_regMapInit) return;
+        DgRegMap.ItemsSource = _regMap;
+        _regMapInit = true;
+    }
+
+    private void BtnRegMapRead_Click(object sender, RoutedEventArgs e)
+    {
+        InitRegMap();
+        if (_port == null || !_port.IsOpen) return;
+        TxtRegMapStatus.Text = "Reading...";
+
+        Task.Run(() =>
+        {
+            try
+            {
+                byte slave = GetMbSlave();
+                int gap = _gapMs;
+
+                // Read blocks: 0x0000-0x0008, 0x0010-0x001A, 0x0020-0x0028
+                ushort[][] blocks = { ReadMbBlock(slave, 0x0000, 9, gap), ReadMbBlock(slave, 0x0010, 11, gap), ReadMbBlock(slave, 0x0012, 3, gap), ReadMbBlock(slave, 0x0015, 6, gap), ReadMbBlock(slave, 0x0020, 9, gap) };
+
+                Dispatcher.BeginInvoke(() =>
+                {
+                    foreach (var reg in _regMap)
+                    {
+                        ushort addr = reg.RawAddr;
+                        ushort? val = null;
+
+                        if (addr <= 0x0008 && blocks[0] != null && addr < blocks[0].Length)
+                            val = blocks[0][addr];
+                        else if (addr >= 0x0012 && addr <= 0x0014 && blocks[2] != null && addr - 0x0012 < blocks[2].Length)
+                            val = blocks[2][addr - 0x0012];
+                        else if (addr >= 0x0015 && addr <= 0x001A && blocks[3] != null && addr - 0x0015 < blocks[3].Length)
+                            val = blocks[3][addr - 0x0015];
+                        else if (addr >= 0x0020 && addr <= 0x0028 && blocks[4] != null && addr - 0x0020 < blocks[4].Length)
+                            val = blocks[4][addr - 0x0020];
+
+                        if (val.HasValue)
+                        {
+                            reg.Value = $"0x{val:X4}";
+                            reg.Dec = $"{val}";
+                        }
+                    }
+                    DgRegMap.Items.Refresh();
+                    TxtRegMapStatus.Text = $"Read OK ({DateTime.Now:HH:mm:ss})";
+                });
+            }
+            catch (Exception ex) { Dispatcher.BeginInvoke(() => TxtRegMapStatus.Text = $"Error: {ex.Message}"); }
+        });
+    }
+
+    private ushort[]? ReadMbBlock(byte slave, ushort start, ushort count, int gap)
+    {
+        try
+        {
+            SendMbRead(slave, start, count);
+            Thread.Sleep(gap + 50);
+            // Response comes via RxLoop → ParseMbResponse
+            // For reg map, read directly
+            if (_port == null || _port.BytesToRead < 2) return null;
+            byte[] hdr = new byte[3];
+            int b = _port.ReadByte();
+            if (b != CMD_MB_RX) return null;
+            int len = _port.ReadByte();
+            if (len <= 0) return null;
+            byte[] resp = new byte[len];
+            int read = 0;
+            var start_t = DateTime.Now;
+            while (read < len && (DateTime.Now - start_t).TotalMilliseconds < 200)
+            {
+                if (_port.BytesToRead > 0) read += _port.Read(resp, read, len - read);
+                else Thread.Sleep(1);
+            }
+            if (resp[1] != 0x03) return null;
+            int bytes = resp[2];
+            int n = bytes / 2;
+            ushort[] regs = new ushort[n];
+            for (int i = 0; i < n && (3 + i * 2 + 1) < len; i++)
+                regs[i] = (ushort)((resp[3 + i * 2] << 8) | resp[3 + i * 2 + 1]);
+            return regs;
+        }
+        catch { return null; }
+    }
 
     protected override void OnClosed(EventArgs e) { SaveWindowState(); SaveSettings(); Disconnect(); base.OnClosed(e); }
 }

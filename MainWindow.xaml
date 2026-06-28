@@ -197,18 +197,41 @@
             </StackPanel>
         </Border>
 
-        <!-- Log -->
-        <Border Grid.Row="3" Background="{StaticResource CatSurface0}" CornerRadius="8" Padding="8">
-            <DockPanel>
-                <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,4">
-                    <TextBlock Text="Log" FontWeight="Bold" Foreground="{StaticResource CatSubtext0}"/>
-                    <Button Content="Clear" Click="BtnClear_Click" Margin="8,0,0,0" Padding="6,2"/>
-                    <Button Content="Fault Log" Click="BtnFaultLog_Click" Margin="4,0,0,0" Padding="6,2"/>
-                </WrapPanel>
-                <TextBox x:Name="TxtLog" IsReadOnly="True" VerticalScrollBarVisibility="Auto"
-                         Background="#181825" Foreground="{StaticResource CatSubtext0}" FontFamily="Cascadia Mono,Consolas"
-                         FontSize="11" TextWrapping="Wrap" BorderThickness="0"/>
-            </DockPanel>
-        </Border>
+        <!-- Log + Register Map tabs -->
+        <TabControl Grid.Row="3" Background="{StaticResource CatSurface0}" BorderThickness="0" Margin="0">
+            <TabItem Header="Log" Foreground="{StaticResource CatText}">
+                <DockPanel Margin="8">
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                        <Button Content="Clear" Click="BtnClear_Click" Padding="6,2"/>
+                        <Button Content="Fault Log" Click="BtnFaultLog_Click" Margin="4,0,0,0" Padding="6,2"/>
+                    </WrapPanel>
+                    <TextBox x:Name="TxtLog" IsReadOnly="True" VerticalScrollBarVisibility="Auto"
+                             Background="#181825" Foreground="{StaticResource CatSubtext0}" FontFamily="Cascadia Mono,Consolas"
+                             FontSize="11" TextWrapping="Wrap" BorderThickness="0"/>
+                </DockPanel>
+            </TabItem>
+            <TabItem Header="Register Map" Foreground="{StaticResource CatText}">
+                <DockPanel Margin="8">
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                        <Button Content="Read All" Click="BtnRegMapRead_Click" Padding="6,2"/>
+                        <TextBlock x:Name="TxtRegMapStatus" Text="" Foreground="{StaticResource CatSubtext0}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                    </WrapPanel>
+                    <DataGrid x:Name="DgRegMap" AutoGenerateColumns="False" IsReadOnly="True"
+                              Background="#181825" Foreground="{StaticResource CatText}"
+                              GridLinesVisibility="Horizontal" HeadersVisibility="Column"
+                              BorderThickness="0" RowBackground="#181825" AlternatingRowBackground="#1e1e2e"
+                              CanUserSortColumns="False" SelectionMode="Single">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Addr" Binding="{Binding Addr}" Width="55"/>
+                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="120"/>
+                            <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="60"/>
+                            <DataGridTextColumn Header="Dec" Binding="{Binding Dec}" Width="55"/>
+                            <DataGridTextColumn Header="R/W" Binding="{Binding RW}" Width="35"/>
+                            <DataGridTextColumn Header="Description" Binding="{Binding Desc}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+        </TabControl>
     </Grid>
 </Window>
