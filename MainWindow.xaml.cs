@@ -306,9 +306,10 @@ public partial class MainWindow : Window
                     SendMbRead(slave, 0x0020, 8); Thread.Sleep(gap);
                     Dispatcher.Invoke(() => _uptimeHiPending = true);
                     SendMbRead(slave, 0x0028, 1); Thread.Sleep(gap);
-                    if (_pollCycle % 2 == 0)
+                    SendMbRead(slave, 0x0012, 3); Thread.Sleep(gap);
+                    if (_pollCycle % 3 == 0)
                         SendMbRead(slave, 0x0100, 16);
-                    else
+                    else if (_pollCycle % 3 == 1)
                         SendMbRead(slave, 0x0015, 6);
                     _pollCycle++;
                 }
@@ -359,6 +360,15 @@ public partial class MainWindow : Window
         ushort[] regs = new ushort[count];
         for (int i = 0; i < count && (3 + i * 2 + 1) < len; i++)
             regs[i] = (ushort)((resp[3 + i * 2] << 8) | resp[3 + i * 2 + 1]);
+
+        // Update Register Map table from any response
+        // Detect block by count + first value range
+        if (count == 9 && regs[0] <= 3) UpdateRegMap(0x0000, regs);
+        else if (count == 8) UpdateRegMap(0x0020, regs);
+        else if (count == 3) UpdateRegMap(0x0012, regs);
+        else if (count == 6 && regs[0] >= 2020) UpdateRegMap(0x0015, regs);
+        else if (count == 1 && _uptimeHiPending) UpdateRegMap(0x0028, regs);
+        else if (count == 16) { /* track name — not in reg map */ }
 
         if (count == 9 && regs[0] <= 3)
         {
@@ -690,6 +700,25 @@ public partial class MainWindow : Window
     // ── Register Map ────────────────────────────────────────────
     public class RegEntry { public string Addr { get; set; } = ""; public string Name { get; set; } = ""; public string Value { get; set; } = "—"; public string Dec { get; set; } = ""; public string RW { get; set; } = ""; public string Desc { get; set; } = ""; public ushort RawAddr; }
 
+    private void UpdateRegMap(ushort startAddr, ushort[] regs)
+    {
+        if (!_regMapInit) return;
+        for (int i = 0; i < regs.Length; i++)
+        {
+            ushort addr = (ushort)(startAddr + i);
+            foreach (var reg in _regMap)
+            {
+                if (reg.RawAddr == addr)
+                {
+                    reg.Value = $"0x{regs[i]:X4}";
+                    reg.Dec = $"{regs[i]}";
+                    break;
+                }
+            }
+        }
+        DgRegMap.Items.Refresh();
+    }
+
     private readonly List<RegEntry> _regMap = new()
     {
         new() { RawAddr=0x0000, Addr="0x0000", Name="STATE",      RW="RO", Desc="0=stop 1=play 3=pause" },
@@ -754,8 +783,7 @@ public partial class MainWindow : Window
             return;
         }
         if (_port == null || !_port.IsOpen) return;
-        TxtRegMapStatus.Text = "Reading...";
-        Task.Run(() => DoRegMapRead());
+        TxtRegMapStatus.Text = "Live — values update from poll";
     }
 
     private void DoRegMapRead()
