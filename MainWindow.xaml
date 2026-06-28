@@ -61,6 +61,23 @@
                         <ComboBoxItem Content="460800"/>
                     </ComboBox>
                     <Button Content="Set" Click="BtnSetMbBaud_Click" Padding="4,4"/>
+                    <TextBlock Text=" Poll:" VerticalAlignment="Center" Margin="4,0,2,0" Foreground="{StaticResource CatSubtext0}"/>
+                    <ComboBox x:Name="CmbPollRate" Width="55" Height="24" SelectedIndex="2" SelectionChanged="CmbPollRate_Changed">
+                        <ComboBoxItem Content="100ms"/>
+                        <ComboBoxItem Content="250ms"/>
+                        <ComboBoxItem Content="500ms"/>
+                        <ComboBoxItem Content="1s"/>
+                        <ComboBoxItem Content="2s"/>
+                        <ComboBoxItem Content="5s"/>
+                    </ComboBox>
+                    <TextBlock Text=" Gap:" VerticalAlignment="Center" Margin="4,0,2,0" Foreground="{StaticResource CatSubtext0}"/>
+                    <ComboBox x:Name="CmbGap" Width="50" Height="24" SelectedIndex="1" SelectionChanged="CmbGap_Changed">
+                        <ComboBoxItem Content="10ms"/>
+                        <ComboBoxItem Content="20ms"/>
+                        <ComboBoxItem Content="50ms"/>
+                        <ComboBoxItem Content="100ms"/>
+                        <ComboBoxItem Content="200ms"/>
+                    </ComboBox>
                     <TextBlock Text=" CAN:" VerticalAlignment="Center" Margin="4,0,2,0"/>
                     <ComboBox x:Name="CmbCanBaud" Width="60" Height="24" SelectedIndex="2">
                         <ComboBoxItem Content="20k"/>

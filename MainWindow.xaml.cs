@@ -27,6 +27,9 @@ public partial class MainWindow : Window
     private SerialPort? _port;
     private CancellationTokenSource? _cts;
     private int _txCount, _rxCount, _lastState, _pollCycle;
+    private int _pollMs = 500, _gapMs = 20;
+    static readonly int[] PollRates = [100, 250, 500, 1000, 2000, 5000];
+    static readonly int[] GapRates = [10, 20, 50, 100, 200];
     private bool _suppressVol, _suppressRepeat, _monoState, _autoplayState = true;
     private ushort _uptimeLow;
     private bool _uptimeHiPending;
@@ -92,7 +95,7 @@ public partial class MainWindow : Window
         {
             string port = CmbPort.SelectedItem?.ToString() ?? "";
             string bus = RbCan.IsChecked == true ? "CAN" : "MB";
-            File.WriteAllText(SettingsPath, $"{port},{TxtCanTarget.Text},{TxtMbSlave.Text},{bus},{CmbMbBaud.SelectedIndex},{CmbCanBaud.SelectedIndex}");
+            File.WriteAllText(SettingsPath, $"{port},{TxtCanTarget.Text},{TxtMbSlave.Text},{bus},{CmbMbBaud.SelectedIndex},{CmbCanBaud.SelectedIndex},{CmbPollRate.SelectedIndex},{CmbGap.SelectedIndex}");
         }
         catch { }
     }
@@ -110,6 +113,8 @@ public partial class MainWindow : Window
             if (p.Length >= 4) { RbCan.IsChecked = p[3] == "CAN"; RbModbus.IsChecked = p[3] == "MB"; }
             if (p.Length >= 5 && int.TryParse(p[4], out int mbi) && mbi >= 0 && mbi < 7) CmbMbBaud.SelectedIndex = mbi;
             if (p.Length >= 6 && int.TryParse(p[5], out int cbi) && cbi >= 0 && cbi < 6) CmbCanBaud.SelectedIndex = cbi;
+            if (p.Length >= 7 && int.TryParse(p[6], out int pri) && pri >= 0 && pri < PollRates.Length) { CmbPollRate.SelectedIndex = pri; _pollMs = PollRates[pri]; }
+            if (p.Length >= 8 && int.TryParse(p[7], out int gri) && gri >= 0 && gri < GapRates.Length) { CmbGap.SelectedIndex = gri; _gapMs = GapRates[gri]; }
         }
         catch { }
     }
@@ -151,6 +156,20 @@ public partial class MainWindow : Window
     }
 
     private void BtnRefresh_Click(object sender, RoutedEventArgs e) => RefreshPorts();
+
+    private void CmbPollRate_Changed(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        int idx = CmbPollRate.SelectedIndex;
+        if (idx >= 0 && idx < PollRates.Length) _pollMs = PollRates[idx];
+        SaveSettings();
+    }
+
+    private void CmbGap_Changed(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        int idx = CmbGap.SelectedIndex;
+        if (idx >= 0 && idx < GapRates.Length) _gapMs = GapRates[idx];
+        SaveSettings();
+    }
 
     static readonly string[] MbBaudNames = ["9600","19200","38400","57600","115200","230400","460800"];
     static readonly string[] CanBaudNames = ["20k","50k","125k","250k","500k","1M"];
@@ -280,10 +299,11 @@ public partial class MainWindow : Window
                 else
                 {
                     byte slave = GetMbSlave();
-                    SendMbRead(slave, 0x0000, 9); Thread.Sleep(50);
-                    SendMbRead(slave, 0x0020, 8); Thread.Sleep(50);
+                    int gap = _gapMs;
+                    SendMbRead(slave, 0x0000, 9); Thread.Sleep(gap);
+                    SendMbRead(slave, 0x0020, 8); Thread.Sleep(gap);
                     Dispatcher.Invoke(() => _uptimeHiPending = true);
-                    SendMbRead(slave, 0x0028, 1); Thread.Sleep(50);
+                    SendMbRead(slave, 0x0028, 1); Thread.Sleep(gap);
                     if (_pollCycle % 2 == 0)
                         SendMbRead(slave, 0x0100, 16);
                     else
@@ -292,7 +312,7 @@ public partial class MainWindow : Window
                 }
             }
             catch { }
-            Thread.Sleep(500);
+            Thread.Sleep(_pollMs);
         }
     }
 
