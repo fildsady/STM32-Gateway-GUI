@@ -51,7 +51,7 @@
                     <TextBox x:Name="TxtMbSlave" Width="30" Height="24" Text="1"
                              Background="{StaticResource CatSurface0}" Foreground="{StaticResource CatText}"/>
                     <TextBlock Text="  MB:" VerticalAlignment="Center" Margin="8,0,2,0"/>
-                    <ComboBox x:Name="CmbMbBaud" Width="70" Height="24" SelectedIndex="4">
+                    <ComboBox x:Name="CmbMbBaud" Width="80" Height="24" SelectedIndex="4">
                         <ComboBoxItem Content="9600"/>
                         <ComboBoxItem Content="19200"/>
                         <ComboBoxItem Content="38400"/>
@@ -62,7 +62,7 @@
                     </ComboBox>
                     <Button Content="Set" Click="BtnSetMbBaud_Click" Padding="4,4"/>
                     <TextBlock Text=" Poll:" VerticalAlignment="Center" Margin="4,0,2,0" Foreground="{StaticResource CatSubtext0}"/>
-                    <ComboBox x:Name="CmbPollRate" Width="55" Height="24" SelectedIndex="2" SelectionChanged="CmbPollRate_Changed">
+                    <ComboBox x:Name="CmbPollRate" Width="68" Height="24" SelectedIndex="2" SelectionChanged="CmbPollRate_Changed">
                         <ComboBoxItem Content="100ms"/>
                         <ComboBoxItem Content="250ms"/>
                         <ComboBoxItem Content="500ms"/>
@@ -71,7 +71,7 @@
                         <ComboBoxItem Content="5s"/>
                     </ComboBox>
                     <TextBlock Text=" Gap:" VerticalAlignment="Center" Margin="4,0,2,0" Foreground="{StaticResource CatSubtext0}"/>
-                    <ComboBox x:Name="CmbGap" Width="50" Height="24" SelectedIndex="1" SelectionChanged="CmbGap_Changed">
+                    <ComboBox x:Name="CmbGap" Width="65" Height="24" SelectedIndex="1" SelectionChanged="CmbGap_Changed">
                         <ComboBoxItem Content="10ms"/>
                         <ComboBoxItem Content="20ms"/>
                         <ComboBoxItem Content="50ms"/>
@@ -79,7 +79,7 @@
                         <ComboBoxItem Content="200ms"/>
                     </ComboBox>
                     <TextBlock Text=" CAN:" VerticalAlignment="Center" Margin="4,0,2,0"/>
-                    <ComboBox x:Name="CmbCanBaud" Width="60" Height="24" SelectedIndex="2">
+                    <ComboBox x:Name="CmbCanBaud" Width="65" Height="24" SelectedIndex="2">
                         <ComboBoxItem Content="20k"/>
                         <ComboBoxItem Content="50k"/>
                         <ComboBoxItem Content="125k"/>
