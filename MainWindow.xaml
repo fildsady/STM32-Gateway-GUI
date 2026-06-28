@@ -1,7 +1,7 @@
 <Window x:Class="STM32GatewayGui.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="STM32 Gateway" Height="650" Width="520"
+        Title="STM32 Gateway" Height="700" Width="720"
         Background="#1E1E2E" Foreground="#CDD6F4"
         FontFamily="Segoe UI" FontSize="13">
     <Window.Resources>
