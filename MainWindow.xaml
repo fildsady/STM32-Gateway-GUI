@@ -88,9 +88,14 @@
                         <ComboBoxItem Content="1M"/>
                     </ComboBox>
                     <Button Content="Set" Click="BtnSetCanBaud_Click" Padding="4,4"/>
-                    <TextBlock Text="  via:" VerticalAlignment="Center" Margin="4,0,4,0" Foreground="{StaticResource CatSubtext0}"/>
-                    <RadioButton x:Name="RbCan" Content="CAN" IsChecked="True" Foreground="{StaticResource CatTeal}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <RadioButton x:Name="RbModbus" Content="Modbus" Foreground="{StaticResource CatMauve}" VerticalAlignment="Center"/>
+                    <TextBlock Text="  Bus:" VerticalAlignment="Center" Margin="4,0,2,0" Foreground="{StaticResource CatSubtext0}"/>
+                    <ComboBox x:Name="CmbBusMode" Width="110" Height="24" SelectedIndex="2" SelectionChanged="CmbBusMode_Changed">
+                        <ComboBoxItem Content="CAN only"/>
+                        <ComboBoxItem Content="Modbus only"/>
+                        <ComboBoxItem Content="CAN → Modbus"/>
+                        <ComboBoxItem Content="Modbus → CAN"/>
+                    </ComboBox>
+                    <TextBlock x:Name="TxtBusStatus" Text="" VerticalAlignment="Center" Foreground="{StaticResource CatYellow}" FontSize="11" Margin="6,0,0,0"/>
                 </WrapPanel>
             </StackPanel>
         </Border>
