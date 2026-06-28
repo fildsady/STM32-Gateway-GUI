@@ -29,6 +29,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _cts;
     private int _txCount, _rxCount, _lastState, _pollCycle;
     private int _trafficTx, _trafficRx;
+    private volatile byte[]? _faultResponse;
     private int _pollMs = 500, _gapMs = 20;
     static readonly int[] PollRates = [100, 250, 500, 1000, 2000, 5000];
     static readonly int[] GapRates = [10, 20, 50, 100, 200];
@@ -197,53 +198,51 @@ public partial class MainWindow : Window
         if (_port == null || !_port.IsOpen) return;
         try
         {
+            _faultResponse = null;
             _port.Write(new byte[] { 0xFE, 0xFE, 0x10 }, 0, 3);
             Log("Requesting fault log...");
             Task.Run(() =>
             {
-                try
+                var start = DateTime.Now;
+                while (_faultResponse == null && (DateTime.Now - start).TotalMilliseconds < 1000)
+                    Thread.Sleep(10);
+
+                byte[]? resp = _faultResponse;
+                _faultResponse = null;
+
+                if (resp == null || resp.Length < 4) { Dispatcher.BeginInvoke(() => Log("No fault data")); return; }
+
+                int count = resp[3];
+                if (count == 0) { Dispatcher.BeginInvoke(() => Log("No faults recorded")); return; }
+
+                int entrySize = 17;
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine("=== Fault Log ===");
+                string[] types = ["?", "HardFault", "StackOverflow", "WDT", "Assert"];
+                for (int i = 0; i < count; i++)
                 {
-                    Thread.Sleep(200);
-                    if (_port == null || _port.BytesToRead < 4) { Log("No fault data"); return; }
-                    byte[] hdr = new byte[4];
-                    _port.Read(hdr, 0, 4);
-                    if (hdr[0] != 0xFE || hdr[1] != 0xFE || hdr[2] != 0x10) return;
-                    int count = hdr[3];
-                    if (count == 0) { Dispatcher.BeginInvoke(() => Log("No faults recorded")); return; }
-                    int entrySize = 17;
-                    byte[] data = new byte[count * entrySize];
-                    int read = 0;
-                    while (read < data.Length && _port.BytesToRead > 0)
-                        read += _port.Read(data, read, data.Length - read);
-
-                    var sb = new System.Text.StringBuilder();
-                    sb.AppendLine("=== Fault Log ===");
-                    string[] types = ["?", "HardFault", "StackOverflow", "WDT", "Assert"];
-                    for (int i = 0; i < count; i++)
-                    {
-                        int off = i * entrySize;
-                        int type = data[off];
-                        uint pc = BitConverter.ToUInt32(data, off + 1);
-                        uint lr = BitConverter.ToUInt32(data, off + 5);
-                        uint uptime = BitConverter.ToUInt32(data, off + 9);
-                        uint cfsr = BitConverter.ToUInt32(data, off + 13);
-                        string tname = type < types.Length ? types[type] : $"0x{type:X2}";
-                        sb.AppendLine($"[{i}] {tname} PC=0x{pc:X8} LR=0x{lr:X8} up={uptime}s CFSR=0x{cfsr:X8}");
-                    }
-
-                    string logText = sb.ToString();
-                    Dispatcher.BeginInvoke(() =>
-                    {
-                        Log(logText);
-                        var dlg = new Microsoft.Win32.SaveFileDialog { Filter = "Text|*.txt", FileName = "fault_log.txt" };
-                        if (dlg.ShowDialog() == true)
-                        {
-                            System.IO.File.WriteAllText(dlg.FileName, logText);
-                            Log($"Saved: {dlg.FileName}");
-                        }
-                    });
+                    int off = 4 + i * entrySize;
+                    if (off + entrySize > resp.Length) break;
+                    int type = resp[off];
+                    uint pc = BitConverter.ToUInt32(resp, off + 1);
+                    uint lr = BitConverter.ToUInt32(resp, off + 5);
+                    uint uptime = BitConverter.ToUInt32(resp, off + 9);
+                    uint cfsr = BitConverter.ToUInt32(resp, off + 13);
+                    string tname = type < types.Length ? types[type] : $"0x{type:X2}";
+                    sb.AppendLine($"[{i}] {tname} PC=0x{pc:X8} LR=0x{lr:X8} up={uptime}s CFSR=0x{cfsr:X8}");
                 }
-                catch (Exception ex) { Dispatcher.BeginInvoke(() => Log($"Fault read error: {ex.Message}")); }
+
+                string logText = sb.ToString();
+                Dispatcher.BeginInvoke(() =>
+                {
+                    Log(logText);
+                    var dlg = new Microsoft.Win32.SaveFileDialog { Filter = "Text|*.txt", FileName = "fault_log.txt" };
+                    if (dlg.ShowDialog() == true)
+                    {
+                        System.IO.File.WriteAllText(dlg.FileName, logText);
+                        Log($"Saved: {dlg.FileName}");
+                    }
+                });
             });
         }
         catch { }
@@ -259,6 +258,31 @@ public partial class MainWindow : Window
             {
                 if (_port == null || !_port.IsOpen) break;
                 int b = _port.ReadByte();
+                if (b == 0xFE)
+                {
+                    int b2 = _port.ReadByte();
+                    if (b2 == 0xFE)
+                    {
+                        int cmd = _port.ReadByte();
+                        if (cmd == 0x10)
+                        {
+                            int count = _port.ReadByte();
+                            int entrySize = 17;
+                            byte[] data = new byte[4 + count * entrySize];
+                            data[0] = 0xFE; data[1] = 0xFE; data[2] = 0x10; data[3] = (byte)count;
+                            int read = 0, total = count * entrySize;
+                            var t = DateTime.Now;
+                            while (read < total && (DateTime.Now - t).TotalMilliseconds < 500)
+                            {
+                                if (_port.BytesToRead > 0) read += _port.Read(data, 4 + read, total - read);
+                                else Thread.Sleep(1);
+                            }
+                            _faultResponse = data;
+                        }
+                    }
+                    continue;
+                }
+
                 if (b == CMD_CAN_RX)
                 {
                     _port.Read(buf, 0, 3);
