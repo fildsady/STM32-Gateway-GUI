@@ -804,6 +804,70 @@ public partial class MainWindow : Window
         });
     }
 
+    // ── Sensor Test ──────────────────────────────────────────
+    private DateTime _lastAnalogSend = DateTime.MinValue;
+
+    private void SendSensorFrame(byte flags)
+    {
+        uint hub = (uint)(CmbTestHub.SelectedIndex + 1);
+        uint canId = 0x500 + hub;
+        byte.TryParse(TxtTestZone.Text, out byte zone);
+        byte type = (byte)(CmbTestType.SelectedIndex + 1);
+        byte.TryParse(TxtTestValue.Text, out byte value);
+        SendCanFrame(canId, [zone, type, value, flags]);
+        string ts = DateTime.Now.ToString("HH:mm:ss.fff");
+        string fstr = (flags & 3) switch { 1 => "RISE", 2 => "FALL", 3 => "BOTH", _ => "?" };
+        TxtTestLog.AppendText($"[{ts}] H{hub} zone={zone} type={CmbTestType.Text} val={value} {fstr}\n");
+        TxtTestLog.ScrollToEnd();
+    }
+
+    private void BtnTestRising_Click(object sender, RoutedEventArgs e) => SendSensorFrame(0x01);
+    private void BtnTestFalling_Click(object sender, RoutedEventArgs e) => SendSensorFrame(0x02);
+    private void BtnTestBoth_Click(object sender, RoutedEventArgs e) => SendSensorFrame(0x03);
+
+    private void SliderTestAnalog_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (TxtTestAnalogVal != null) TxtTestAnalogVal.Text = $"{(int)SliderTestAnalog.Value}";
+    }
+
+    private void BtnTestAnalogSend_Click(object sender, RoutedEventArgs e)
+    {
+        uint hub = (uint)(CmbTestHub.SelectedIndex + 1);
+        byte val = (byte)SliderTestAnalog.Value;
+        byte.TryParse(TxtTestZone.Text, out byte zone);
+        SendCanFrame(0x500 + hub, [zone, 0x05, val, 0x01]);
+        string ts = DateTime.Now.ToString("HH:mm:ss.fff");
+        TxtTestLog.AppendText($"[{ts}] H{hub} zone={zone} analog={val}\n");
+        TxtTestLog.ScrollToEnd();
+    }
+
+    // ── Remote Test ─────────────────────────────────────────
+    private void SendRemoteCmd(byte cmd, byte val = 0)
+    {
+        uint hub = (uint)(CmbRemoteHub.SelectedIndex + 1);
+        SendCanFrame(0x500 + hub, [cmd, val]);
+        string ts = DateTime.Now.ToString("HH:mm:ss.fff");
+        string[] names = ["?","Play","Stop","Next","Prev","Pause","Vol"];
+        string name = cmd <= 6 ? names[cmd] : $"0x{cmd:X2}";
+        TxtTestLog.AppendText($"[{ts}] Remote H{hub} {name} val={val}\n");
+        TxtTestLog.ScrollToEnd();
+    }
+
+    private void BtnRemotePlay_Click(object sender, RoutedEventArgs e) => SendRemoteCmd(0x01);
+    private void BtnRemoteStop_Click(object sender, RoutedEventArgs e) => SendRemoteCmd(0x02);
+    private void BtnRemoteNext_Click(object sender, RoutedEventArgs e) => SendRemoteCmd(0x03);
+    private void BtnRemotePrev_Click(object sender, RoutedEventArgs e) => SendRemoteCmd(0x04);
+    private void BtnRemotePause_Click(object sender, RoutedEventArgs e) => SendRemoteCmd(0x05);
+    private void SliderRemoteVol_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (TxtRemoteVolVal == null) return;
+        TxtRemoteVolVal.Text = $"{(int)SliderRemoteVol.Value}%";
+        if (_port == null || !_port.IsOpen) return;
+        if ((DateTime.Now - _lastAnalogSend).TotalMilliseconds < 100) return;
+        _lastAnalogSend = DateTime.Now;
+        SendRemoteCmd(0x06, (byte)SliderRemoteVol.Value);
+    }
+
     private void BtnTrafficClear_Click(object sender, RoutedEventArgs e)
     {
         TxtTrafficTx.Clear(); TxtTrafficRx.Clear();

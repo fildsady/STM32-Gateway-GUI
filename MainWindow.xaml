@@ -243,6 +243,81 @@
                     </Grid>
                 </DockPanel>
             </TabItem>
+            <TabItem Header="Sensor Test" Foreground="{StaticResource CatText}">
+                <DockPanel Margin="8">
+                    <StackPanel DockPanel.Dock="Top">
+                        <TextBlock Text="Simulate Sensor Hub → Player" Foreground="{StaticResource CatSubtext0}" Margin="0,0,0,6"/>
+                        <WrapPanel>
+                            <TextBlock Text="Hub:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                            <ComboBox x:Name="CmbTestHub" Width="50" Height="24" SelectedIndex="0">
+                                <ComboBoxItem Content="H1"/>
+                                <ComboBoxItem Content="H2"/>
+                                <ComboBoxItem Content="H3"/>
+                                <ComboBoxItem Content="H4"/>
+                                <ComboBoxItem Content="H5"/>
+                                <ComboBoxItem Content="H6"/>
+                                <ComboBoxItem Content="H7"/>
+                                <ComboBoxItem Content="H8"/>
+                            </ComboBox>
+                            <TextBlock Text=" Zone:" VerticalAlignment="Center" Margin="8,0,4,0"/>
+                            <TextBox x:Name="TxtTestZone" Width="28" Height="24" Text="0"
+                                     Background="{StaticResource CatSurface0}" Foreground="{StaticResource CatText}"/>
+                            <TextBlock Text=" Type:" VerticalAlignment="Center" Margin="8,0,4,0"/>
+                            <ComboBox x:Name="CmbTestType" Width="70" Height="24" SelectedIndex="0">
+                                <ComboBoxItem Content="PIR"/>
+                                <ComboBoxItem Content="Door"/>
+                                <ComboBoxItem Content="Button"/>
+                                <ComboBoxItem Content="Beam"/>
+                                <ComboBoxItem Content="Analog"/>
+                            </ComboBox>
+                            <TextBlock Text=" Val:" VerticalAlignment="Center" Margin="8,0,4,0"/>
+                            <TextBox x:Name="TxtTestValue" Width="32" Height="24" Text="1"
+                                     Background="{StaticResource CatSurface0}" Foreground="{StaticResource CatText}"/>
+                        </WrapPanel>
+                        <WrapPanel Margin="0,6,0,0">
+                            <Button Content="▲ Rising" Click="BtnTestRising_Click" Padding="8,4" Foreground="{StaticResource CatGreen}"/>
+                            <Button Content="▼ Falling" Click="BtnTestFalling_Click" Padding="8,4" Foreground="{StaticResource CatRed}"/>
+                            <Button Content="▲▼ Both" Click="BtnTestBoth_Click" Padding="8,4" Foreground="{StaticResource CatYellow}"/>
+                        </WrapPanel>
+                        <WrapPanel Margin="0,6,0,0">
+                            <TextBlock Text="Analog Remote:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <Slider x:Name="SliderTestAnalog" Width="200" Minimum="0" Maximum="100" Value="50"
+                                    ValueChanged="SliderTestAnalog_Changed" IsSnapToTickEnabled="True" TickFrequency="1"/>
+                            <TextBlock x:Name="TxtTestAnalogVal" Text="50" Width="30" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                            <Button Content="Send" Click="BtnTestAnalogSend_Click" Padding="6,4" Margin="4,0,0,0"/>
+                        </WrapPanel>
+                        <Separator Background="{StaticResource CatSurface1}" Margin="0,8,0,6"/>
+                        <TextBlock Text="Remote Test (Hub sends command via 0x500+H)" Foreground="{StaticResource CatSubtext0}" Margin="0,0,0,4"/>
+                        <WrapPanel>
+                            <TextBlock Text="Hub:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                            <ComboBox x:Name="CmbRemoteHub" Width="50" Height="24" SelectedIndex="0">
+                                <ComboBoxItem Content="H1"/>
+                                <ComboBoxItem Content="H2"/>
+                                <ComboBoxItem Content="H3"/>
+                                <ComboBoxItem Content="H4"/>
+                                <ComboBoxItem Content="H5"/>
+                                <ComboBoxItem Content="H6"/>
+                                <ComboBoxItem Content="H7"/>
+                                <ComboBoxItem Content="H8"/>
+                            </ComboBox>
+                            <Button Content="⏮ Prev" Click="BtnRemotePrev_Click" Padding="6,4" Margin="4,0,0,0"/>
+                            <Button Content="▶ Play" Click="BtnRemotePlay_Click" Padding="6,4"/>
+                            <Button Content="⏹ Stop" Click="BtnRemoteStop_Click" Padding="6,4"/>
+                            <Button Content="⏭ Next" Click="BtnRemoteNext_Click" Padding="6,4"/>
+                            <Button Content="⏸ Pause" Click="BtnRemotePause_Click" Padding="6,4"/>
+                        </WrapPanel>
+                        <WrapPanel Margin="0,4,0,0">
+                            <TextBlock Text="Vol:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                            <Slider x:Name="SliderRemoteVol" Width="160" Minimum="0" Maximum="100" Value="80"
+                                    ValueChanged="SliderRemoteVol_Changed" IsSnapToTickEnabled="True" TickFrequency="1"/>
+                            <TextBlock x:Name="TxtRemoteVolVal" Text="80%" Width="32" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                        </WrapPanel>
+                    </StackPanel>
+                    <TextBox x:Name="TxtTestLog" IsReadOnly="True" VerticalScrollBarVisibility="Auto"
+                             Background="#181825" Foreground="{StaticResource CatSubtext0}" FontFamily="Cascadia Mono,Consolas"
+                             FontSize="11" TextWrapping="Wrap" BorderThickness="0" Margin="0,6,0,0"/>
+                </DockPanel>
+            </TabItem>
             <TabItem Header="Register Map" Foreground="{StaticResource CatText}">
                 <DockPanel Margin="8">
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,4">
