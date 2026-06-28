@@ -732,50 +732,82 @@ public partial class MainWindow : Window
         _regMapInit = true;
     }
 
+    private void RegTx(string msg)
+    {
+        Dispatcher.BeginInvoke(() => { TxtRegTx.AppendText($"[{DateTime.Now:ss.fff}] {msg}\n"); TxtRegTx.ScrollToEnd(); });
+    }
+
+    private void RegRx(string msg)
+    {
+        Dispatcher.BeginInvoke(() => { TxtRegRx.AppendText($"[{DateTime.Now:ss.fff}] {msg}\n"); TxtRegRx.ScrollToEnd(); });
+    }
+
+    private CancellationTokenSource? _regLiveCts;
+
     private void BtnRegMapRead_Click(object sender, RoutedEventArgs e)
     {
         InitRegMap();
+        if (ChkRegLive.IsChecked == true)
+        {
+            if (_regLiveCts != null) { _regLiveCts.Cancel(); _regLiveCts = null; ChkRegLive.IsChecked = false; TxtRegMapStatus.Text = "Stopped"; return; }
+            _regLiveCts = new CancellationTokenSource();
+            var ct = _regLiveCts.Token;
+            Task.Run(() =>
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    DoRegMapRead();
+                    Thread.Sleep(_pollMs);
+                }
+            });
+            TxtRegMapStatus.Text = "Live...";
+            return;
+        }
         if (_port == null || !_port.IsOpen) return;
         TxtRegMapStatus.Text = "Reading...";
+        Task.Run(() => DoRegMapRead());
+    }
 
-        Task.Run(() =>
+    private void DoRegMapRead()
+    {
+        try
         {
-            try
+            byte slave = GetMbSlave();
+            int gap = _gapMs;
+
+            RegTx($"FC03 S{slave} 0x0000 x9");
+            ushort[]? b0 = ReadMbBlock(slave, 0x0000, 9, gap);
+            if (b0 != null) RegRx($"[{b0.Length*2}B] {string.Join(" ", Array.ConvertAll(b0, v => $"{v:X4}"))}");
+
+            RegTx($"FC03 S{slave} 0x0012 x3");
+            ushort[]? b2 = ReadMbBlock(slave, 0x0012, 3, gap);
+            if (b2 != null) RegRx($"[{b2.Length*2}B] {string.Join(" ", Array.ConvertAll(b2, v => $"{v:X4}"))}");
+
+            RegTx($"FC03 S{slave} 0x0015 x6");
+            ushort[]? b3 = ReadMbBlock(slave, 0x0015, 6, gap);
+            if (b3 != null) RegRx($"[{b3.Length*2}B] {string.Join(" ", Array.ConvertAll(b3, v => $"{v:X4}"))}");
+
+            RegTx($"FC03 S{slave} 0x0020 x9");
+            ushort[]? b4 = ReadMbBlock(slave, 0x0020, 9, gap);
+            if (b4 != null) RegRx($"[{b4.Length*2}B] {string.Join(" ", Array.ConvertAll(b4, v => $"{v:X4}"))}");
+
+            Dispatcher.BeginInvoke(() =>
             {
-                byte slave = GetMbSlave();
-                int gap = _gapMs;
-
-                // Read blocks: 0x0000-0x0008, 0x0010-0x001A, 0x0020-0x0028
-                ushort[][] blocks = { ReadMbBlock(slave, 0x0000, 9, gap), ReadMbBlock(slave, 0x0010, 11, gap), ReadMbBlock(slave, 0x0012, 3, gap), ReadMbBlock(slave, 0x0015, 6, gap), ReadMbBlock(slave, 0x0020, 9, gap) };
-
-                Dispatcher.BeginInvoke(() =>
+                foreach (var reg in _regMap)
                 {
-                    foreach (var reg in _regMap)
-                    {
-                        ushort addr = reg.RawAddr;
-                        ushort? val = null;
-
-                        if (addr <= 0x0008 && blocks[0] != null && addr < blocks[0].Length)
-                            val = blocks[0][addr];
-                        else if (addr >= 0x0012 && addr <= 0x0014 && blocks[2] != null && addr - 0x0012 < blocks[2].Length)
-                            val = blocks[2][addr - 0x0012];
-                        else if (addr >= 0x0015 && addr <= 0x001A && blocks[3] != null && addr - 0x0015 < blocks[3].Length)
-                            val = blocks[3][addr - 0x0015];
-                        else if (addr >= 0x0020 && addr <= 0x0028 && blocks[4] != null && addr - 0x0020 < blocks[4].Length)
-                            val = blocks[4][addr - 0x0020];
-
-                        if (val.HasValue)
-                        {
-                            reg.Value = $"0x{val:X4}";
-                            reg.Dec = $"{val}";
-                        }
-                    }
-                    DgRegMap.Items.Refresh();
-                    TxtRegMapStatus.Text = $"Read OK ({DateTime.Now:HH:mm:ss})";
-                });
-            }
-            catch (Exception ex) { Dispatcher.BeginInvoke(() => TxtRegMapStatus.Text = $"Error: {ex.Message}"); }
-        });
+                    ushort addr = reg.RawAddr;
+                    ushort? val = null;
+                    if (addr <= 0x0008 && b0 != null && addr < b0.Length) val = b0[addr];
+                    else if (addr >= 0x0012 && addr <= 0x0014 && b2 != null && addr - 0x0012 < b2.Length) val = b2[addr - 0x0012];
+                    else if (addr >= 0x0015 && addr <= 0x001A && b3 != null && addr - 0x0015 < b3.Length) val = b3[addr - 0x0015];
+                    else if (addr >= 0x0020 && addr <= 0x0028 && b4 != null && addr - 0x0020 < b4.Length) val = b4[addr - 0x0020];
+                    if (val.HasValue) { reg.Value = $"0x{val:X4}"; reg.Dec = $"{val}"; }
+                }
+                DgRegMap.Items.Refresh();
+                TxtRegMapStatus.Text = $"OK ({DateTime.Now:HH:mm:ss})";
+            });
+        }
+        catch (Exception ex) { Dispatcher.BeginInvoke(() => TxtRegMapStatus.Text = $"Error: {ex.Message}"); }
     }
 
     private ushort[]? ReadMbBlock(byte slave, ushort start, ushort count, int gap)
