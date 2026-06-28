@@ -732,16 +732,6 @@ public partial class MainWindow : Window
         _regMapInit = true;
     }
 
-    private void RegTx(string msg)
-    {
-        Dispatcher.BeginInvoke(() => { TxtRegTx.AppendText($"[{DateTime.Now:ss.fff}] {msg}\n"); TxtRegTx.ScrollToEnd(); });
-    }
-
-    private void RegRx(string msg)
-    {
-        Dispatcher.BeginInvoke(() => { TxtRegRx.AppendText($"[{DateTime.Now:ss.fff}] {msg}\n"); TxtRegRx.ScrollToEnd(); });
-    }
-
     private CancellationTokenSource? _regLiveCts;
 
     private void BtnRegMapRead_Click(object sender, RoutedEventArgs e)
@@ -775,22 +765,10 @@ public partial class MainWindow : Window
             byte slave = GetMbSlave();
             int gap = _gapMs;
 
-            RegTx($"FC03 S{slave} 0x0000 x9");
             ushort[]? b0 = ReadMbBlock(slave, 0x0000, 9, gap);
-            if (b0 != null) RegRx($"[{b0.Length*2}B] {string.Join(" ", Array.ConvertAll(b0, v => $"{v:X4}"))}");
-
-            RegTx($"FC03 S{slave} 0x0012 x3");
             ushort[]? b2 = ReadMbBlock(slave, 0x0012, 3, gap);
-            if (b2 != null) RegRx($"[{b2.Length*2}B] {string.Join(" ", Array.ConvertAll(b2, v => $"{v:X4}"))}");
-
-            RegTx($"FC03 S{slave} 0x0015 x6");
             ushort[]? b3 = ReadMbBlock(slave, 0x0015, 6, gap);
-            if (b3 != null) RegRx($"[{b3.Length*2}B] {string.Join(" ", Array.ConvertAll(b3, v => $"{v:X4}"))}");
-
-            RegTx($"FC03 S{slave} 0x0020 x9");
             ushort[]? b4 = ReadMbBlock(slave, 0x0020, 9, gap);
-            if (b4 != null) RegRx($"[{b4.Length*2}B] {string.Join(" ", Array.ConvertAll(b4, v => $"{v:X4}"))}");
-
             Dispatcher.BeginInvoke(() =>
             {
                 foreach (var reg in _regMap)
