@@ -28,6 +28,7 @@ public partial class MainWindow : Window
     private SerialPort? _port;
     private CancellationTokenSource? _cts;
     private int _txCount, _rxCount, _lastState, _pollCycle;
+    private int _trafficTx, _trafficRx;
     private int _pollMs = 500, _gapMs = 20;
     static readonly int[] PollRates = [100, 250, 500, 1000, 2000, 5000];
     static readonly int[] GapRates = [10, 20, 50, 100, 200];
@@ -266,7 +267,7 @@ public partial class MainWindow : Window
                     if (dlc > 0) _port.Read(buf, 3, dlc);
                     byte[] data = new byte[dlc];
                     Array.Copy(buf, 3, data, 0, dlc);
-                    Dispatcher.BeginInvoke(() => { _rxCount++; ParseCanFrame(id, data); });
+                    Dispatcher.BeginInvoke(() => { _rxCount++; ParseCanFrame(id, data); TrafficRx($"CAN 0x{id:X3} [{dlc}] {BitConverter.ToString(data).Replace("-"," ")}"); });
                 }
                 else if (b == CMD_MB_RX)
                 {
@@ -275,7 +276,7 @@ public partial class MainWindow : Window
                     byte[] resp = new byte[len];
                     int read = 0;
                     while (read < len) read += _port.Read(resp, read, len - read);
-                    Dispatcher.BeginInvoke(() => { _rxCount++; ParseMbResponse(resp, len); });
+                    Dispatcher.BeginInvoke(() => { _rxCount++; ParseMbResponse(resp, len); TrafficRx($"MB [{len}] {BitConverter.ToString(resp).Replace("-"," ")}"); });
                 }
             }
             catch (TimeoutException) { }
@@ -443,6 +444,7 @@ public partial class MainWindow : Window
             pkt[0] = CMD_CAN_TX; pkt[1] = (byte)(id >> 8); pkt[2] = (byte)(id & 0xFF); pkt[3] = (byte)data.Length;
             Array.Copy(data, 0, pkt, 4, data.Length);
             _port.Write(pkt, 0, pkt.Length); _txCount++;
+            TrafficTx($"CAN 0x{id:X3} [{data.Length}] {BitConverter.ToString(data).Replace("-"," ")}");
         }
         catch { }
     }
@@ -460,6 +462,7 @@ public partial class MainWindow : Window
             byte[] pkt = new byte[10]; pkt[0] = CMD_MB_TX; pkt[1] = 8;
             Array.Copy(req, 0, pkt, 2, 8);
             _port.Write(pkt, 0, 10); _txCount++;
+            TrafficTx($"MB FC03 S{slave} 0x{start:X4} x{count}");
         }
         catch { }
     }
@@ -477,6 +480,7 @@ public partial class MainWindow : Window
             byte[] pkt = new byte[10]; pkt[0] = CMD_MB_TX; pkt[1] = 8;
             Array.Copy(req, 0, pkt, 2, 8);
             _port.Write(pkt, 0, 10); _txCount++;
+            TrafficTx($"MB FC06 S{slave} 0x{addr:X4}={value}");
         }
         catch { }
     }
@@ -651,6 +655,37 @@ public partial class MainWindow : Window
     }
 
     private void BtnClear_Click(object sender, RoutedEventArgs e) { TxtLog.Clear(); _txCount = 0; _rxCount = 0; }
+
+    private void TrafficTx(string msg)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (ChkTrafficRun.IsChecked != true) return;
+            _trafficTx++;
+            TxtTrafficTx.AppendText($"[{DateTime.Now:HH:mm:ss.fff}] {msg}\n");
+            TxtTrafficTx.ScrollToEnd();
+            TxtTrafficCount.Text = $" TX:{_trafficTx} RX:{_trafficRx}";
+        });
+    }
+
+    private void TrafficRx(string msg)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (ChkTrafficRun.IsChecked != true) return;
+            _trafficRx++;
+            TxtTrafficRx.AppendText($"[{DateTime.Now:HH:mm:ss.fff}] {msg}\n");
+            TxtTrafficRx.ScrollToEnd();
+            TxtTrafficCount.Text = $" TX:{_trafficTx} RX:{_trafficRx}";
+        });
+    }
+
+    private void BtnTrafficClear_Click(object sender, RoutedEventArgs e)
+    {
+        TxtTrafficTx.Clear(); TxtTrafficRx.Clear();
+        _trafficTx = 0; _trafficRx = 0;
+        TxtTrafficCount.Text = " TX:0 RX:0";
+    }
 
     // ── Register Map ────────────────────────────────────────────
     public class RegEntry { public string Addr { get; set; } = ""; public string Name { get; set; } = ""; public string Value { get; set; } = "—"; public string Dec { get; set; } = ""; public string RW { get; set; } = ""; public string Desc { get; set; } = ""; public ushort RawAddr; }
