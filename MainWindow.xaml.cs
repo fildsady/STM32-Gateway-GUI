@@ -666,6 +666,17 @@ public partial class MainWindow : Window
 
     private void BtnClear_Click(object sender, RoutedEventArgs e) { TxtLog.Clear(); _txCount = 0; _rxCount = 0; }
 
+    private void BtnTestFault_Click(object sender, RoutedEventArgs e)
+    {
+        if (_port == null || !_port.IsOpen) return;
+        try
+        {
+            _port.Write(new byte[] { 0xFE, 0xFE, 0x11 }, 0, 3);
+            Log("Test fault written — click Fault Log to read");
+        }
+        catch { }
+    }
+
     private void TrafficTx(string msg)
     {
         Dispatcher.BeginInvoke(() =>

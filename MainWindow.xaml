@@ -204,6 +204,7 @@
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,4">
                         <Button Content="Clear" Click="BtnClear_Click" Padding="6,2"/>
                         <Button Content="Fault Log" Click="BtnFaultLog_Click" Margin="4,0,0,0" Padding="6,2"/>
+                    <Button Content="Test Fault" Click="BtnTestFault_Click" Margin="4,0,0,0" Padding="6,2"/>
                     </WrapPanel>
                     <TextBox x:Name="TxtLog" IsReadOnly="True" VerticalScrollBarVisibility="Auto"
                              Background="#181825" Foreground="{StaticResource CatSubtext0}" FontFamily="Cascadia Mono,Consolas"
